@@ -4,12 +4,10 @@
   "description": "A online multiplayer endless tic tac toe game running on azure.",
   "main": "index.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node index.js",
+    "build": "node index.js"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "express": "^4.18.2"
-  }
+  "license": "ISC"
 }
