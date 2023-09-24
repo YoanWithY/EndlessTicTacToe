@@ -13,6 +13,12 @@ function getContentTypeFromPath(path: string) {
     if (path.endsWith(".svg"))
         return "image/svg+xml";
 
+    if (path.endsWith(".css"))
+        return "text/css";
+
+    if (path.endsWith(".js"))
+        return "text/javascript";
+
     return "text/plain";
 }
 

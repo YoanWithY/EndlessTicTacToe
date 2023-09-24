@@ -11,6 +11,10 @@ function getContentTypeFromPath(path) {
         return "text/html";
     if (path.endsWith(".svg"))
         return "image/svg+xml";
+    if (path.endsWith(".css"))
+        return "text/css";
+    if (path.endsWith(".js"))
+        return "text/javascript";
     return "text/plain";
 }
 function servFile(response, path) {
