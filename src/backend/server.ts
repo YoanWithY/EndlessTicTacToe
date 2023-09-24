@@ -1,10 +1,7 @@
-const http = require('http');
-const fs = require("fs");
+import * as http from 'http';
+import * as fs from "fs";
 
-function getContentTypeFromPath(path) {
-    if (path === undefined)
-        return "text/plain";
-
+function getContentTypeFromPath(path: string) {
     if (path.endsWith(".html"))
         return "text/html";
 
@@ -14,7 +11,11 @@ function getContentTypeFromPath(path) {
     return "text/plain";
 }
 
-function servFile(response, path) {
+function servFile(response: http.ServerResponse<http.IncomingMessage> & {
+    req: http.IncomingMessage
+}, path?: string) {
+    if (!path)
+        return;
     try {
         const type = getContentTypeFromPath(path);
         const file = fs.readFileSync(`.${path}`);
