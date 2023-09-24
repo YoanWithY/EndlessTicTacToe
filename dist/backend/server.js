@@ -25,6 +25,8 @@ function servFile(response, path) {
     }
 }
 const server = http.createServer(function (request, response) {
+    console.log(__dirname);
+    console.log(__filename);
     if (request.url === "/") {
         servFile(response, "/index.html");
     }
