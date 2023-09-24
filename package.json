@@ -2,9 +2,9 @@
   "name": "endlesstictactoe",
   "version": "1.0.0",
   "description": "A online multiplayer endless tic tac toe game running on azure.",
-  "main": "server.js",
+  "main": "index.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node index.js"
   },
   "keywords": [],
   "author": "",
