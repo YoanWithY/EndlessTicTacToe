@@ -2,6 +2,10 @@ import * as http from 'http';
 import * as fs from "fs";
 import * as path from "path";
 
+function rootPath(p: string) {
+    return path.normalize(__dirname + "/../../" + p);
+}
+
 function getContentTypeFromPath(path: string) {
     if (path.endsWith(".html"))
         return "text/html";
@@ -19,12 +23,10 @@ function servFile(response: http.ServerResponse<http.IncomingMessage> & {
         return;
     try {
         const type = getContentTypeFromPath(path);
-        const file = fs.readFileSync(`.${path}`);
+        const file = fs.readFileSync(rootPath(path));
         response.writeHead(200, { "Content-Type": type });
         response.end(file);
     } catch (err) {
-        console.log(__dirname);
-        console.log(__filename);
         console.error(err);
         response.writeHead(500, { "Content-Type": "text/plain" });
         response.end("Error trying to serve a file.");

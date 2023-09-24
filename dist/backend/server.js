@@ -2,6 +2,10 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const http = require("http");
 const fs = require("fs");
+const path = require("path");
+function rootPath(p) {
+    return path.normalize(__dirname + "/../../" + p);
+}
 function getContentTypeFromPath(path) {
     if (path.endsWith(".html"))
         return "text/html";
@@ -14,7 +18,7 @@ function servFile(response, path) {
         return;
     try {
         const type = getContentTypeFromPath(path);
-        const file = fs.readFileSync(`.${path}`);
+        const file = fs.readFileSync(rootPath(path));
         response.writeHead(200, { "Content-Type": type });
         response.end(file);
     }
@@ -25,8 +29,6 @@ function servFile(response, path) {
     }
 }
 const server = http.createServer(function (request, response) {
-    console.log(__dirname);
-    console.log(__filename);
     if (request.url === "/") {
         servFile(response, "/index.html");
     }
