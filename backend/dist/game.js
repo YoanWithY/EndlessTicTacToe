@@ -11,6 +11,13 @@ class Player {
         this.color = playerNumber;
         this.shape = "none";
     }
+    update(playerData) {
+        this.name = playerData.name;
+        this.shape = playerData.shape;
+        this.color = playerData.color;
+        this.ready = playerData.isPlayerRead;
+        this.playerNumber = this.playerNumber;
+    }
 }
 exports.Player = Player;
 exports.shapes = ["square_filled", "circle_filled", "triangle_filled", "cross", "square", "circle", "triangle"];
@@ -47,6 +54,9 @@ class Game {
         this.availableShapes.delete(shape);
         player.shape = shape;
         return true;
+    }
+    giveBackShape(shape) {
+        this.availableShapes.add(shape);
     }
     getAllPlayerData() {
         const d = [];

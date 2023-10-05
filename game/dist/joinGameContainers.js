@@ -9,17 +9,38 @@ export class JoinGamePanel extends HTMLElement {
         const title = document.createElement("h2");
         title.textContent = `Join Game: ${gameID}`;
         jgp.appendChild(title);
+        let thisPlayerPanel;
         for (let i = 0; i < players.length; i++) {
             const player = players[i];
             if (i === playerNumber) {
                 jgp.otherPlayerPanels[i] = null;
-                jgp.appendChild(ThisPlayerPanel.create(player, webSocket));
+                thisPlayerPanel = ThisPlayerPanel.create(player, webSocket);
+                jgp.appendChild(thisPlayerPanel);
                 continue;
             }
             const otherPlayerPanel = OtherPlayerPanel.create(player);
             jgp.otherPlayerPanels[i] = otherPlayerPanel;
             jgp.appendChild(otherPlayerPanel);
         }
+        const hc = document.createElement("horizontal-container");
+        const backButton = document.createElement("button");
+        backButton.textContent = "Back";
+        backButton.addEventListener("click", e => {
+            window.location.href = window.location.origin;
+        });
+        hc.appendChild(backButton);
+        const readyButton = document.createElement("button");
+        readyButton.textContent = "Ready";
+        readyButton.addEventListener("click", e => {
+            const p = players[playerNumber];
+            p.isPlayerReady = true;
+            const data = { command: "updatePlayerData", player: p.getWSData() };
+            webSocket.send(JSON.stringify(data));
+            readyButton.disabled = true;
+            thisPlayerPanel.nameInput.disabled = true;
+        });
+        hc.appendChild(readyButton);
+        jgp.appendChild(hc);
         return jgp;
     }
 }
@@ -58,6 +79,7 @@ class ThisPlayerPanel extends HTMLElement {
             updatePlayerData();
         });
         p.appendChild(playerNameInput);
+        p.nameInput = playerNameInput;
         return p;
     }
 }
@@ -90,7 +112,6 @@ class OtherPlayerPanel extends HTMLElement {
         const playerReadyText = document.createElement("span");
         playerReadyText.textContent = player.isPlayerReady ? "Ready" : "-";
         playerReadyText.setAttribute("class", "playerReady");
-        p.playerReadyText = playerReadyText;
         p.appendChild(playerReadyText);
         p.playerReadyText = playerReadyText;
         return p;

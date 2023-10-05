@@ -69,6 +69,11 @@ const httpFunctions = {
         servJson(response, { gameID: game.gameID });
     },
     async game(request, response, urlArr) {
+        if (urlArr.length <= 1 || urlArr[1] == "") {
+            response.writeHead(301, { 'Location': '/' });
+            response.end();
+            return;
+        }
         const num = Number.parseInt(urlArr[1]);
         if (isNaN(num)) {
             servFile(response, request.url);
@@ -105,9 +110,16 @@ function httpHandling(request, response) {
 }
 const wsFunctions = {
     updatePlayerData(webSocket, game, data) {
+        const playerData = data.player;
+        const player = game.players[playerData.playerNumber];
+        if (!player)
+            return;
+        player.update(playerData);
         game.webSocketServer.clients.forEach((client) => {
-            const res = data;
-            client.send(JSON.stringify(res));
+            if (client !== webSocket) {
+                const res = data;
+                client.send(JSON.stringify(res));
+            }
         });
     }
 };
@@ -143,6 +155,8 @@ function httpUpgradeHandling(request, socket, head) {
         }
         const res = { command: "connectAsPlayer", playerData: game.getAllPlayerData(), playerNumber: playerNumber };
         webSocket.send(JSON.stringify(res));
+        const updateData = { command: "updatePlayerData", player: { playerNumber: playerNumber, name: player.name, color: player.color, isPlayerRead: player.ready, shape: player.shape } };
+        wsFunctions.updatePlayerData(webSocket, game, updateData);
         webSocket.on("message", msg => {
             const data = JSON.parse(String(msg));
             if (!(data.command))
@@ -150,6 +164,23 @@ function httpUpgradeHandling(request, socket, head) {
             const fun = wsFunctions[data.command];
             if (fun)
                 fun(webSocket, game, data);
+        });
+        webSocket.on("close", (code, reason) => {
+            game.giveBackShape(player.shape);
+            const updateData = { command: "updatePlayerData", player: { playerNumber: playerNumber, name: "-", color: player.color, isPlayerRead: false, shape: "none" } };
+            wsFunctions.updatePlayerData(webSocket, game, updateData);
+            game.players[playerNumber] = undefined;
+            // check if any player is leaft
+            for (const p of game.players)
+                if (p)
+                    return;
+            // if not close the game
+            game.webSocketServer.clients.forEach(ws => {
+                ws.close();
+            });
+            game.webSocketServer.close();
+            game_1.games.delete(game.gameID);
+            console.log(`Terminated Game: ${game.gameID}`);
         });
     });
 }

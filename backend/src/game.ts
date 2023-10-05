@@ -14,6 +14,14 @@ export class Player {
         this.color = playerNumber as ws_color;
         this.shape = "none";
     }
+
+    update(playerData: ws_player_data) {
+        this.name = playerData.name;
+        this.shape = playerData.shape;
+        this.color = playerData.color;
+        this.ready = playerData.isPlayerRead;
+        this.playerNumber = this.playerNumber;
+    }
 }
 
 export const shapes: ws_player_shape[] = ["square_filled", "circle_filled", "triangle_filled", "cross", "square", "circle", "triangle"];
@@ -57,6 +65,10 @@ export default class Game {
         this.availableShapes.delete(shape);
         player.shape = shape;
         return true;
+    }
+
+    giveBackShape(shape: ws_player_shape) {
+        this.availableShapes.add(shape);
     }
 
     getAllPlayerData() {
