@@ -1,4 +1,8 @@
 import { shapePaths } from "./gameState.js";
+function updatePlayerData(webSocket, player) {
+    const data = { command: "updatePlayerData", player: player.getWSData() };
+    webSocket.send(JSON.stringify(data));
+}
 export class JoinGamePanel extends HTMLElement {
     constructor() {
         super(...arguments);
@@ -34,10 +38,11 @@ export class JoinGamePanel extends HTMLElement {
         readyButton.addEventListener("click", e => {
             const p = players[playerNumber];
             p.isPlayerReady = true;
-            const data = { command: "updatePlayerData", player: p.getWSData() };
-            webSocket.send(JSON.stringify(data));
+            updatePlayerData(webSocket, p);
             readyButton.disabled = true;
             thisPlayerPanel.nameInput.disabled = true;
+            const data = { command: "playerReady" };
+            webSocket.send(JSON.stringify(data));
         });
         hc.appendChild(readyButton);
         jgp.appendChild(hc);
@@ -66,17 +71,13 @@ class ThisPlayerPanel extends HTMLElement {
         p.path = path;
         p.icon = icon;
         p.appendChild(icon);
-        function updatePlayerData() {
-            const data = { command: "updatePlayerData", player: player.getWSData() };
-            webSocket.send(JSON.stringify(data));
-        }
         const playerNameInput = document.createElement("input");
         playerNameInput.setAttribute("type", "text");
         playerNameInput.value = player.name;
         playerNameInput.setAttribute("class", "playerNameInput");
         playerNameInput.addEventListener("input", (e) => {
             player.name = playerNameInput.value;
-            updatePlayerData();
+            updatePlayerData(webSocket, player);
         });
         p.appendChild(playerNameInput);
         p.nameInput = playerNameInput;

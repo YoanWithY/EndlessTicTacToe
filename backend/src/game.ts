@@ -28,12 +28,12 @@ export const shapes: ws_player_shape[] = ["square_filled", "circle_filled", "tri
 export default class Game {
     availableShapes: Set<ws_player_shape> = new Set(shapes);
     gameID: number;
-    movesPerTurn: number;
+    movesPerTurn: ws_move_in_row;
     playerCount: number;
-    winCondition: number;
+    winCondition: ws_cnfw;
     players: (Player | undefined)[] = [];
     webSocketServer = new WebSocket.Server({ noServer: true });
-    constructor(gameID: number, movesPerTurn: number, playerCount: number, winCondition: number) {
+    constructor(gameID: number, movesPerTurn: ws_move_in_row, playerCount: number, winCondition: ws_cnfw) {
         this.gameID = gameID;
         this.movesPerTurn = movesPerTurn;
         this.playerCount = playerCount;
@@ -83,7 +83,7 @@ export default class Game {
 
 export const games = new Map<number, Game>();
 
-export function genGame(movesPerTurn: number, playerCount: number, winCondition: number): Game {
+export function genGame(movesPerTurn: ws_move_in_row, playerCount: number, winCondition: ws_cnfw): Game {
     const mod = 10000;
     let attempt = Date.now() % mod;
     while (games.has(attempt)) {

@@ -1,6 +1,6 @@
 /// <reference path="../../shared/types.d.ts"/>
 import { HorizontalContainer, VerticalContainer } from "./containers.js";
-import { Color, Game, Player, shapesPath2D } from "./gameState.js";
+import { Color, Game, Player } from "./gameState.js";
 import { JoinGamePanel } from "./joinGameContainers.js";
 
 const canvas = document.createElement("canvas");
@@ -43,11 +43,15 @@ webSocket.addEventListener("error", (e) => {
 const players: Player[] = [];
 let game: Game;
 let playerNumber: number;
+let cnfw: ws_cnfw;
+let movesInRow: ws_move_in_row;
 
 function resize() {
     const dpr = window.devicePixelRatio || 1;
     canvas.width = canvas.clientWidth * dpr;
     canvas.height = canvas.clientHeight * dpr;
+    if (game)
+        game.render();
 }
 resize();
 
@@ -63,6 +67,8 @@ const ws_all_functions: { [key: string]: (webSocket: WebSocket, data: any) => vo
             players[i] = new Player(p.name, p.color, p.shape, p.playerNumber, p.isPlayerRead);
         }
         playerNumber = data.playerNumber;
+        cnfw = data.cdfw;
+        movesInRow = data.movesInRow;
         joinGamePanel = JoinGamePanel.create(wrapper, players, gameID, playerNumber, webSocket);
         wrapper.appendChild(joinGamePanel);
     },
@@ -70,7 +76,8 @@ const ws_all_functions: { [key: string]: (webSocket: WebSocket, data: any) => vo
 
 const ws_player_functions: { [key: string]: (webSocket: WebSocket, data: any) => void } = {
     startGame(webSocket: WebSocket) {
-        game = new Game(canvas, players);
+        game = new Game(webSocket, canvas, players, playerNumber, cnfw, movesInRow);
+        document.body.removeChild(wrapper);
         game.render();
     },
     updatePlayerData(webSocket: WebSocket, data: ws_res_update_player_data) {
@@ -88,6 +95,10 @@ const ws_player_functions: { [key: string]: (webSocket: WebSocket, data: any) =>
         if (opp === null)
             return;
         opp.setFromPlayer(player);
+    },
+    newChip(webSocket: WebSocket, data: ws_res_new_chip) {
+        game.newChipProtokoll(data.chip.x, data.chip.y, false);
+        game.render();
     }
 }
 

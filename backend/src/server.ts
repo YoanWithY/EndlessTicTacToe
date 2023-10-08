@@ -147,6 +147,28 @@ const wsFunctions: { [key: string]: (webSocket: WebSocket, game: Game, data: any
                 client.send(JSON.stringify(res));
             }
         });
+    },
+    playerReady(webSocket: WebSocket, game: Game, data: ws_req_player_ready) {
+        const players = game.players;
+        for (const p of players) {
+            if (!p)
+                return;
+            if (!p.ready)
+                return;
+        }
+
+        game.webSocketServer.clients.forEach((client: WebSocket) => {
+            const data: ws_start_game = { command: "startGame" };
+            client.send(JSON.stringify(data));
+        });
+    },
+    newChip(webSocket: WebSocket, game: Game, data: ws_req_new_chip) {
+        game.webSocketServer.clients.forEach((client: WebSocket) => {
+            if (client !== webSocket) {
+                const res: ws_res_new_chip = data;
+                client.send(JSON.stringify(res));
+            }
+        });
     }
 };
 
@@ -186,7 +208,7 @@ function httpUpgradeHandling(request: http.IncomingMessage, socket: net.Socket, 
                 break;
         }
 
-        const res: ws_res_connection_as_player = { command: "connectAsPlayer", playerData: game.getAllPlayerData(), playerNumber: playerNumber };
+        const res: ws_res_connection_as_player = { command: "connectAsPlayer", playerData: game.getAllPlayerData(), playerNumber: playerNumber, cdfw: game.winCondition, movesInRow: game.movesPerTurn };
         webSocket.send(JSON.stringify(res));
         const updateData: ws_res_update_player_data = { command: "updatePlayerData", player: { playerNumber: playerNumber, name: player.name, color: player.color, isPlayerRead: player.ready, shape: player.shape } };
         wsFunctions.updatePlayerData(webSocket, game, updateData);
@@ -202,6 +224,7 @@ function httpUpgradeHandling(request: http.IncomingMessage, socket: net.Socket, 
         });
 
         webSocket.on("close", (code, reason) => {
+            console.log(`Game ${gameID}: Player ${playerNumber} closed connection.`);
             game.giveBackShape(player.shape);
             const updateData: ws_res_update_player_data = { command: "updatePlayerData", player: { playerNumber: playerNumber, name: "-", color: player.color, isPlayerRead: false, shape: "none" } };
             wsFunctions.updatePlayerData(webSocket, game, updateData);

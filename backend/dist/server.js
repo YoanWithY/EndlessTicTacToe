@@ -121,6 +121,27 @@ const wsFunctions = {
                 client.send(JSON.stringify(res));
             }
         });
+    },
+    playerReady(webSocket, game, data) {
+        const players = game.players;
+        for (const p of players) {
+            if (!p)
+                return;
+            if (!p.ready)
+                return;
+        }
+        game.webSocketServer.clients.forEach((client) => {
+            const data = { command: "startGame" };
+            client.send(JSON.stringify(data));
+        });
+    },
+    newChip(webSocket, game, data) {
+        game.webSocketServer.clients.forEach((client) => {
+            if (client !== webSocket) {
+                const res = data;
+                client.send(JSON.stringify(res));
+            }
+        });
     }
 };
 function httpUpgradeHandling(request, socket, head) {
@@ -153,7 +174,7 @@ function httpUpgradeHandling(request, socket, head) {
             if (game.migrateShape(s, player))
                 break;
         }
-        const res = { command: "connectAsPlayer", playerData: game.getAllPlayerData(), playerNumber: playerNumber };
+        const res = { command: "connectAsPlayer", playerData: game.getAllPlayerData(), playerNumber: playerNumber, cdfw: game.winCondition, movesInRow: game.movesPerTurn };
         webSocket.send(JSON.stringify(res));
         const updateData = { command: "updatePlayerData", player: { playerNumber: playerNumber, name: player.name, color: player.color, isPlayerRead: player.ready, shape: player.shape } };
         wsFunctions.updatePlayerData(webSocket, game, updateData);
@@ -166,6 +187,7 @@ function httpUpgradeHandling(request, socket, head) {
                 fun(webSocket, game, data);
         });
         webSocket.on("close", (code, reason) => {
+            console.log(`Game ${gameID}: Player ${playerNumber} closed connection.`);
             game.giveBackShape(player.shape);
             const updateData = { command: "updatePlayerData", player: { playerNumber: playerNumber, name: "-", color: player.color, isPlayerRead: false, shape: "none" } };
             wsFunctions.updatePlayerData(webSocket, game, updateData);

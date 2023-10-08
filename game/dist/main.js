@@ -31,10 +31,14 @@ webSocket.addEventListener("error", (e) => {
 const players = [];
 let game;
 let playerNumber;
+let cnfw;
+let movesInRow;
 function resize() {
     const dpr = window.devicePixelRatio || 1;
     canvas.width = canvas.clientWidth * dpr;
     canvas.height = canvas.clientHeight * dpr;
+    if (game)
+        game.render();
 }
 resize();
 window.addEventListener("resize", resize);
@@ -47,13 +51,16 @@ const ws_all_functions = {
             players[i] = new Player(p.name, p.color, p.shape, p.playerNumber, p.isPlayerRead);
         }
         playerNumber = data.playerNumber;
+        cnfw = data.cdfw;
+        movesInRow = data.movesInRow;
         joinGamePanel = JoinGamePanel.create(wrapper, players, gameID, playerNumber, webSocket);
         wrapper.appendChild(joinGamePanel);
     },
 };
 const ws_player_functions = {
     startGame(webSocket) {
-        game = new Game(canvas, players);
+        game = new Game(webSocket, canvas, players, playerNumber, cnfw, movesInRow);
+        document.body.removeChild(wrapper);
         game.render();
     },
     updatePlayerData(webSocket, data) {
@@ -68,6 +75,10 @@ const ws_player_functions = {
         if (opp === null)
             return;
         opp.setFromPlayer(player);
+    },
+    newChip(webSocket, data) {
+        game.newChipProtokoll(data.chip.x, data.chip.y, false);
+        game.render();
     }
 };
 webSocket.addEventListener("message", (ev) => {

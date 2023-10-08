@@ -110,6 +110,7 @@ export class Player {
     name: string;
     color: ws_color;
     colorRGB: Color;
+    colorStr: string;
     shape: ws_player_shape
     shapePath2D: Path2D;
     playerNumber: number;
@@ -119,8 +120,10 @@ export class Player {
         this.name = playerName;
         this.color = color;
         this.colorRGB = colors[color];
+        this.colorStr = this.colorRGB.toString();
         this.shape = playerIcon;
-        this.shapePath2D = shapesPath2D[playerIcon];
+        this.shapePath2D = new Path2D(shapePaths.get(playerIcon));
+        console.log(this.shapePath2D);
         this.playerNumber = playerNubmer;
         this.isPlayerReady = isPlayerReady
     }
@@ -133,8 +136,9 @@ export class Player {
         this.name = newPlayerData.name;
         this.color = newPlayerData.color;
         this.colorRGB = colors[newPlayerData.color];
+        this.colorStr = this.colorRGB.toString();
         this.shape = newPlayerData.shape;
-        this.shapePath2D = shapesPath2D[this.shape];
+        this.shapePath2D = new Path2D(shapePaths.get(newPlayerData.shape));
         this.playerNumber = newPlayerData.playerNumber;
         this.isPlayerReady = newPlayerData.isPlayerRead;
     }
@@ -150,33 +154,37 @@ shapePaths.set("triangle_filled", "M 0.1,1 A 0.1,0.1,0,0,1,0.0105572809, 0.85527
 shapePaths.set("cross", "M 0.3585786437627, 0.5 L 0.0292893218813, 0.8292893218813 A 0.1,0.1,0,0,0,0.1707106781187, 0.9707106781187 L 0.5, 0.6414213562373 L 0.8292893218813, 0.9707106781187 A 0.1,0.1,0,0,0,0.9707106781187, 0.8292893218813 L 0.6414213562373, 0.5 L 0.9707106781187, 0.1707106781187 A 0.1,0.1,0,0,0,0.8292893218813, 0.0292893218813 L 0.5, 0.3585786437627 L 0.1707106781187, 0.0292893218813 A 0.1,0.1,0,0,0,0.0292893218813, 0.1707106781187");
 shapePaths.set("none", "M 0,0 L 1,1");
 
-export const shapesPath2D: { [key: string]: Path2D } = {
-    "square": new Path2D(shapePaths.get("square")),
-    "square_filled": new Path2D(shapePaths.get("square_filled")),
-    "circle": new Path2D(shapePaths.get("circle")),
-    "circle_filled": new Path2D(shapePaths.get("circle_filled")),
-    "triangle": new Path2D(shapePaths.get("triangle")),
-    "triangle_filled": new Path2D(shapePaths.get("triangle_filled")),
-    "cross": new Path2D(shapePaths.get("cross"))
-};
-
 export class Game {
     players: Player[];
     boundaries: Boundary[] = [];
     chips: Chip[] = [];
 
-    s = 16;
+    s = 32;
     mx = 0;
     my = 0;
     isDragging = false;
     lastX = 0;
     lastY = 0;
 
-    scaledShapes: { [key: string]: Path2D } = {};
+    /**
+     * Condition For Win
+     */
+    cnfw: ws_cnfw;
+    movesInRow: ws_move_in_row;
+    playerNumber: number;
+    webSocket: WebSocket;
+
     canvas: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;
 
-    constructor(canvas: HTMLCanvasElement, players: Player[]) {
+    activePlayer = 1;
+    chipsPlaced = 0;
+
+    constructor(websocket: WebSocket, canvas: HTMLCanvasElement, players: Player[], playerNumber: number, cnfw: ws_cnfw, movesInRow: ws_move_in_row) {
+        this.cnfw = cnfw;
+        this.movesInRow = movesInRow;
+        this.webSocket = websocket;
+        this.playerNumber = playerNumber;
         this.players = players;
         this.chips.push(new Chip(0, 0, 0));
         this.canvasZoom(1, 0, 0);
@@ -194,7 +202,23 @@ export class Game {
             this.lastY = e.clientY;
         });
 
+        canvas.addEventListener("click", e => {
+            e.preventDefault();
+            if (this.activePlayer !== playerNumber)
+                return;
 
+            const x = e.x - this.mx;
+            const y = e.y - this.my;
+            const ix = Math.floor(x / this.s);
+            const iy = Math.floor(y / this.s);
+
+            console.log(`${ix}, ${iy}`);
+
+            if (this.validateCoordsInput(ix, iy))
+                this.newChipProtokoll(ix, iy, true);
+
+            this.render();
+        })
 
         canvas.addEventListener("mousemove", (e) => {
             e.preventDefault();
@@ -270,16 +294,10 @@ export class Game {
         const ty = y - this.my;
         const prevX = tx / this.s;
         const prevY = ty / this.s;
-        this.s = clamp(this.s * factor, 16, 128);
+        this.s = clamp(this.s * factor, 20, 128);
         const newX = tx / this.s;
         const newY = ty / this.s;
         this.drag((newX - prevX) * this.s, (newY - prevY) * this.s);
-        const dm = new DOMMatrix([this.s, 0, 0, this.s, 0, 0]);
-        for (let shape in shapesPath2D) {
-            const p = new Path2D();
-            p.addPath(shapesPath2D[shape], dm);
-            this.scaledShapes[shape] = p;
-        }
     };
 
     render() {
@@ -308,10 +326,254 @@ export class Game {
             this.ctx.lineTo(width + 0.5, y);
             this.ctx.stroke();
         }
+        const chipSize = this.s - 5;
+        const scale = dpr * chipSize;
+        for (const c of this.chips) {
+            const p = this.players[c.owner];
+            this.ctx.beginPath();
+            const chipSize = this.s - 9;
+            this.ctx.setTransform(
+                chipSize * dpr, 0, 0, chipSize * dpr, (c.x * this.s + 5 + this.mx) * dpr, (c.y * this.s + 5 + this.my) * dpr);
+            this.ctx.fillStyle = p.colorStr;
+            this.ctx.fill(p.shapePath2D, "evenodd");
+        }
 
-        this.ctx.fillStyle = "rgb(100, 10, 10)";
+    }
 
-        this.ctx.fillRect(this.mx, this.my, this.s, this.s);
+    newChipProtokoll(x: number, y: number, sendUpdate = false) {
+        const c = new Chip(x, y, this.activePlayer);
+        this.chips.push(c);
+        this.checkForWinner(x, y);
+
+        this.chipsPlaced++;
+        if (this.chipsPlaced === this.movesInRow) {
+            this.activePlayer = (this.activePlayer + 1) % this.players.length;
+            this.chipsPlaced = 0;
+        }
+
+        if (sendUpdate) {
+            const data: ws_req_new_chip = { command: "newChip", chip: c };
+            this.webSocket.send(JSON.stringify(data));
+        }
+    }
+
+    /**
+     * Validates if a given coordinate is inside a {@link Boundary}.
+     * 
+     * @param x_cord
+     * @param y_cord
+     * @return
+     */
+    private isInsdeBounds(x_cord: number, y_cord: number) {
+        for (const b of this.boundaries)
+            if (x_cord <= b.maxX && x_cord >= b.minX && y_cord <= b.maxY && y_cord >= b.minY)
+                return true;
+        return false;
+    }
+
+    /**
+     * Validates if it is valid to set a chip on the given coordinate.
+     * 
+     * @param inputX
+     * @param inputY
+     * @return
+     */
+    public validateCoordsInput(inputX: number, inputY: number) {
+        if (this.chips.length === 0 && this.nextToBound(inputX, inputY))
+            return true;
+
+        if (this.isInsdeBounds(inputX, inputY))
+            return false;
+
+        let can = false;
+        for (const c of this.chips) {
+            if (c.x == inputX && c.y == inputY)
+                return false;
+
+            if ((c.x == inputX - 1 || c.x == inputX + 1) && c.y == inputY)
+                can = true;
+
+            if ((c.y == inputY - 1 || c.y == inputY + 1) && c.x == inputX)
+                can = true;
+        }
+        return can;
+    }
+
+    public nextToBound(x_cord: number, y_cord: number) {
+        if (this.isInsdeBounds(x_cord, y_cord))
+            return false;
+
+        for (const b of this.boundaries) {
+            if (x_cord == b.maxX + 1 && y_cord <= b.maxY && y_cord >= b.minY)
+                return true;
+
+            if (x_cord == b.minX - 1 && y_cord <= b.maxY && y_cord >= b.minY)
+                return true;
+
+            if (y_cord == b.maxY + 1 && x_cord <= b.maxX && x_cord >= b.minX)
+                return true;
+
+            if (y_cord == b.minY - 1 && x_cord <= b.maxX && x_cord >= b.minX)
+                return true;
+        }
+        return false;
+    }
+
+    checkForWinner(x_i: number, y_i: number): void {
+        let verticalCount: number = 1;
+        let horizontalCount: number = 1;
+        let diagonalOLUR: number = 1;
+        let diagonalULOR: number = 1;
+
+        let durchgang: number = 1;
+
+        const tempChipliste: Chip[] = [];
+
+        for (let i: number = 0; i < this.chips.length; i++) {
+            if (
+                this.chips[i].x <= x_i + this.cnfw &&
+                this.chips[i].x >= x_i - this.cnfw &&
+                this.chips[i].y <= y_i + this.cnfw &&
+                this.chips[i].y >= y_i - this.cnfw &&
+                this.chips[i].owner === this.playerNumber
+            ) {
+                tempChipliste.push(this.chips[i]);
+            }
+        }
+
+        let pass: boolean = true;
+
+        // x +durchgang --------------------
+
+        while (durchgang < this.cnfw && pass) {
+            pass = false;
+            for (let i: number = 0; i < tempChipliste.length; i++) {
+                if (tempChipliste[i].x + durchgang === x_i && tempChipliste[i].y === y_i) {
+                    horizontalCount++;
+                    durchgang++;
+                    pass = true;
+                }
+            }
+        }
+
+        durchgang = 1;
+        pass = true;
+
+        // x -durchgang --------------------
+
+        while (durchgang < this.cnfw && pass) {
+            pass = false;
+            for (let i: number = 0; i < tempChipliste.length; i++) {
+                if (tempChipliste[i].x - durchgang === x_i && tempChipliste[i].y === y_i) {
+                    horizontalCount++;
+                    durchgang++;
+                    pass = true;
+                }
+            }
+        }
+
+        durchgang = 1;
+        pass = true;
+
+        // y +durchgang --------------------
+
+        while (durchgang < this.cnfw && pass) {
+            pass = false;
+            for (let i: number = 0; i < tempChipliste.length; i++) {
+                if (tempChipliste[i].x === x_i && tempChipliste[i].y + durchgang === y_i) {
+                    verticalCount++;
+                    durchgang++;
+                    pass = true;
+                }
+            }
+        }
+
+        durchgang = 1;
+        pass = true;
+
+        // y -durchgang --------------------
+
+        while (durchgang < this.cnfw && pass) {
+            pass = false;
+            for (let i: number = 0; i < tempChipliste.length; i++) {
+                if (tempChipliste[i].x === x_i && tempChipliste[i].y - durchgang === y_i) {
+                    verticalCount++;
+                    durchgang++;
+                    pass = true;
+                }
+            }
+        }
+
+        durchgang = 1;
+        pass = true;
+
+        // ULOR +durchgang --------------------
+
+        while (durchgang < this.cnfw && pass) {
+            pass = false;
+            for (let i: number = 0; i < tempChipliste.length; i++) {
+                if (tempChipliste[i].x + durchgang === x_i && tempChipliste[i].y + durchgang === y_i) {
+                    diagonalULOR++;
+                    durchgang++;
+                    pass = true;
+                }
+            }
+        }
+
+        durchgang = 1;
+        pass = true;
+
+        // ULOR -durchgang --------------------
+
+        while (durchgang < this.cnfw && pass) {
+            pass = false;
+            for (let i: number = 0; i < tempChipliste.length; i++) {
+                if (tempChipliste[i].x - durchgang === x_i && tempChipliste[i].y - durchgang === y_i) {
+                    diagonalULOR++;
+                    durchgang++;
+                    pass = true;
+                }
+            }
+        }
+
+        durchgang = 1;
+        pass = true;
+
+        // OLUR +durchgang --------------------
+
+        while (durchgang < this.cnfw && pass) {
+            pass = false;
+            for (let i: number = 0; i < tempChipliste.length; i++) {
+                if (tempChipliste[i].x - durchgang === x_i && tempChipliste[i].y + durchgang === y_i) {
+                    diagonalOLUR++;
+                    durchgang++;
+                    pass = true;
+                }
+            }
+        }
+
+        durchgang = 1;
+        pass = true;
+
+        // OLUR -durchgang --------------------
+
+        while (durchgang < this.cnfw && pass) {
+            pass = false;
+            for (let i: number = 0; i < tempChipliste.length; i++) {
+                if (tempChipliste[i].x + durchgang === x_i && tempChipliste[i].y - durchgang === y_i) {
+                    diagonalOLUR++;
+                    durchgang++;
+                    pass = true;
+                }
+            }
+        }
+
+        durchgang = 1;
+        pass = true;
+
+        if (verticalCount >= this.cnfw || horizontalCount >= this.cnfw || diagonalOLUR >= this.cnfw || diagonalULOR >= this.cnfw) {
+            // winnerProtokol(this.playerNumber);
+        }
     }
 
 

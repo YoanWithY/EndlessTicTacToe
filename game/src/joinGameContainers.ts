@@ -1,6 +1,11 @@
 /// <reference path="../../shared/types.d.ts" />
 import { HorizontalContainer } from "./containers.js";
-import { Color, Player, shapePaths, shapesPath2D } from "./gameState.js";
+import { Color, Player, shapePaths } from "./gameState.js";
+
+function updatePlayerData(webSocket: WebSocket, player: Player) {
+    const data: ws_req_update_player_data = { command: "updatePlayerData", player: player.getWSData() };
+    webSocket.send(JSON.stringify(data));
+}
 
 export class JoinGamePanel extends HTMLElement {
     otherPlayerPanels: (OtherPlayerPanel | null)[] = [];
@@ -39,10 +44,11 @@ export class JoinGamePanel extends HTMLElement {
         readyButton.addEventListener("click", e => {
             const p = players[playerNumber];
             p.isPlayerReady = true;
-            const data: ws_req_update_player_data = { command: "updatePlayerData", player: p.getWSData() };
-            webSocket.send(JSON.stringify(data));
+            updatePlayerData(webSocket, p);
             readyButton.disabled = true;
             thisPlayerPanel.nameInput.disabled = true;
+            const data: ws_req_player_ready = { command: "playerReady" };
+            webSocket.send(JSON.stringify(data));
         })
         hc.appendChild(readyButton);
 
@@ -82,18 +88,13 @@ class ThisPlayerPanel extends HTMLElement {
         p.icon = icon;
         p.appendChild(icon);
 
-        function updatePlayerData() {
-            const data: ws_req_update_player_data = { command: "updatePlayerData", player: player.getWSData() };
-            webSocket.send(JSON.stringify(data));
-        }
-
         const playerNameInput = document.createElement("input");
         playerNameInput.setAttribute("type", "text");
         playerNameInput.value = player.name;
         playerNameInput.setAttribute("class", "playerNameInput");
         playerNameInput.addEventListener("input", (e) => {
             player.name = playerNameInput.value;
-            updatePlayerData();
+            updatePlayerData(webSocket, player);
         })
         p.appendChild(playerNameInput);
         p.nameInput = playerNameInput;
