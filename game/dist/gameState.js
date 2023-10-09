@@ -13,18 +13,14 @@ export class Boundary {
         this.maxY = Number.MIN_VALUE;
         this.boundChip = oc;
         for (let c of this.boundChip) {
-            if (c.x < this.minX) {
+            if (c.x < this.minX)
                 this.minX = c.x;
-            }
-            if (c.y < this.minY) {
+            if (c.y < this.minY)
                 this.minY = c.y;
-            }
-            if (c.x > this.maxX) {
+            if (c.x > this.maxX)
                 this.maxX = c.x;
-            }
-            if (c.y > this.maxY) {
+            if (c.y > this.maxY)
                 this.maxY = c.y;
-            }
         }
         this.maxX = this.maxX;
         this.minX = this.minX;
@@ -84,9 +80,9 @@ export class Player {
         this.color = color;
         this.colorRGB = colors[color];
         this.colorStr = this.colorRGB.toString();
+        this.darkerColorStr = new Color(this.colorRGB.r / 3, this.colorRGB.g / 3, this.colorRGB.b / 3).toString();
         this.shape = playerIcon;
         this.shapePath2D = new Path2D(shapePaths.get(playerIcon));
-        console.log(this.shapePath2D);
         this.playerNumber = playerNubmer;
         this.isPlayerReady = isPlayerReady;
     }
@@ -98,6 +94,7 @@ export class Player {
         this.color = newPlayerData.color;
         this.colorRGB = colors[newPlayerData.color];
         this.colorStr = this.colorRGB.toString();
+        this.darkerColorStr = new Color(this.colorRGB.r / 3, this.colorRGB.g / 3, this.colorRGB.b / 3).toString();
         this.shape = newPlayerData.shape;
         this.shapePath2D = new Path2D(shapePaths.get(newPlayerData.shape));
         this.playerNumber = newPlayerData.playerNumber;
@@ -123,20 +120,21 @@ export class Game {
         this.isDragging = false;
         this.lastX = 0;
         this.lastY = 0;
-        this.activePlayer = 1;
+        this.activePlayer = 0;
         this.chipsPlaced = 0;
         this.cnfw = cnfw;
         this.movesInRow = movesInRow;
         this.webSocket = websocket;
         this.playerNumber = playerNumber;
         this.players = players;
-        this.chips.push(new Chip(0, 0, 0));
+        this.newChipProtokoll(new Chip(0, 0, 0), false);
         this.canvasZoom(1, 0, 0);
         this.canvas = canvas;
         const c = canvas.getContext("2d");
         if (!c)
             throw new Error("No Context");
         this.ctx = c;
+        this.center();
         canvas.addEventListener("mousedown", (e) => {
             e.preventDefault();
             this.isDragging = true;
@@ -151,9 +149,8 @@ export class Game {
             const y = e.y - this.my;
             const ix = Math.floor(x / this.s);
             const iy = Math.floor(y / this.s);
-            console.log(`${ix}, ${iy}`);
             if (this.validateCoordsInput(ix, iy))
-                this.newChipProtokoll(ix, iy, true);
+                this.newChipProtokoll(new Chip(ix, iy, this.activePlayer), true);
             this.render();
         });
         canvas.addEventListener("mousemove", (e) => {
@@ -171,9 +168,8 @@ export class Game {
         canvas.addEventListener("touchstart", e => {
             for (const t of e.touches)
                 touches[t.identifier] = t;
-        });
+        }, { passive: true });
         canvas.addEventListener("touchmove", e => {
-            e.preventDefault();
             if (e.touches.length === 1) {
                 const thisT = e.touches[0];
                 const lastT = touches[thisT.identifier];
@@ -198,20 +194,33 @@ export class Game {
                 this.drag((dx1 + dx2) / 2, (dy1 + dy2) / 2);
             }
             this.render();
-        });
+        }, { passive: true });
         canvas.addEventListener("touchend", e => {
             for (const t of e.changedTouches)
                 delete touches[t.identifier];
-        });
+        }, { passive: true });
         canvas.addEventListener("wheel", e => {
-            e.preventDefault();
             const val = 1 - e.deltaY / 512;
             this.canvasZoom(val, e.clientX, e.clientY);
             this.render();
-        });
+        }, { passive: true });
         canvas.addEventListener("mouseup", () => {
             this.isDragging = false;
         });
+    }
+    center() {
+        if (this.chips.length === 0) {
+            this.mx = this.canvas.clientWidth / 2;
+            this.my = this.canvas.clientHeight / 2;
+            this.render();
+            return;
+        }
+        const b = new Boundary(this.chips);
+        const midX = (b.maxX + b.minX) / 2 + 0.5;
+        const midY = (b.maxY + b.minY) / 2 + 0.5;
+        this.mx = this.canvas.clientWidth / 2 - midX * this.s;
+        this.my = this.canvas.clientHeight / 2 - midY * this.s;
+        this.render();
     }
     drag(dx, dy) {
         this.mx += dx;
@@ -230,17 +239,42 @@ export class Game {
     }
     ;
     render() {
+        this.ctx.imageSmoothingEnabled = true;
+        this.ctx.imageSmoothingQuality = "high";
         const width = this.canvas.clientWidth;
         const height = this.canvas.clientHeight;
         const dpr = window.devicePixelRatio || 1;
+        const background = "rgb(12, 12, 12)";
         this.ctx.resetTransform();
         this.ctx.scale(dpr, dpr);
-        this.ctx.fillStyle = "rgb(10, 10, 10)";
+        this.ctx.fillStyle = background;
         this.ctx.fillRect(0, 0, width, height);
-        this.ctx.lineWidth = 0.5;
-        this.ctx.strokeStyle = "rgba(100, 100, 100, 0.5)";
-        let x = this.mx % this.s;
-        let y = this.my % this.s;
+        const chipSize = this.s - 9;
+        const drawChip = (c) => {
+            const p = this.players[c.owner];
+            this.ctx.setTransform(chipSize * dpr, 0, 0, chipSize * dpr, (c.x * this.s + 5 + this.mx) * dpr, (c.y * this.s + 5 + this.my) * dpr);
+            this.ctx.fill(p.shapePath2D, "evenodd");
+        };
+        this.ctx.strokeStyle = "rgb(110, 110, 110)";
+        this.ctx.lineWidth = 2;
+        for (let i = this.boundaries.length - 1; i >= 0; i--) {
+            this.ctx.resetTransform();
+            this.ctx.scale(dpr, dpr);
+            const bound = this.boundaries[i];
+            const x = bound.minX * this.s + this.mx;
+            const y = bound.minY * this.s + this.my;
+            const w = (bound.maxX - bound.minX + 1) * this.s;
+            const h = (bound.maxY - bound.minY + 1) * this.s;
+            this.ctx.fillStyle = "rgb(32, 32, 32)";
+            this.ctx.fillRect(x, y, w, h);
+            this.ctx.strokeRect(x + 0.5, y + 0.5, w, h);
+            this.ctx.fillStyle = "rgb(100, 100, 100)";
+            for (const c of bound.boundChip)
+                drawChip(c);
+        }
+        this.ctx.resetTransform();
+        this.ctx.scale(dpr, dpr);
+        this.ctx.lineWidth = 0.25;
         for (let x = this.mx % this.s + 0.5; x < width; x += this.s) {
             this.ctx.beginPath();
             this.ctx.moveTo(x, 0.5);
@@ -253,21 +287,53 @@ export class Game {
             this.ctx.lineTo(width + 0.5, y);
             this.ctx.stroke();
         }
-        const chipSize = this.s - 5;
-        const scale = dpr * chipSize;
         for (const c of this.chips) {
-            const p = this.players[c.owner];
-            this.ctx.beginPath();
-            const chipSize = this.s - 9;
-            this.ctx.setTransform(chipSize * dpr, 0, 0, chipSize * dpr, (c.x * this.s + 5 + this.mx) * dpr, (c.y * this.s + 5 + this.my) * dpr);
-            this.ctx.fillStyle = p.colorStr;
-            this.ctx.fill(p.shapePath2D, "evenodd");
+            this.ctx.fillStyle = this.players[c.owner].colorStr;
+            drawChip(c);
+        }
+        {
+            const panelMargin = 16;
+            const panelChipSize = 40;
+            const margin = 8;
+            const panelChipSpace = panelChipSize + 2 * margin;
+            const totalChips = this.players.length * this.movesInRow;
+            const chipsPerRow = Math.min(Math.floor((width - 2 * panelMargin) / (panelChipSpace + 1)), totalChips);
+            const totalRows = Math.ceil(totalChips / chipsPerRow);
+            const w = chipsPerRow * panelChipSpace;
+            this.ctx.resetTransform();
+            this.ctx.scale(dpr, dpr);
+            let x = panelMargin;
+            let y = height - panelMargin - totalRows * panelChipSpace;
+            this.ctx.fillStyle = background;
+            this.ctx.strokeStyle = "rgb(32, 32, 128)";
+            this.ctx.lineWidth = 1;
+            this.ctx.fillRect(x, y, w, totalRows * panelChipSpace);
+            this.ctx.strokeRect(x, y, w, totalRows * panelChipSpace);
+            x += margin;
+            y += margin;
+            let rowCounter = 1;
+            for (let i = 0; i < this.players.length; i++) {
+                const p = this.players[i];
+                for (let c = 0; c < this.movesInRow; c++) {
+                    this.ctx.fillStyle = (p.playerNumber > this.activePlayer || (p.playerNumber === this.activePlayer && c >= this.chipsPlaced)) ? p.colorStr : p.darkerColorStr;
+                    this.ctx.setTransform(panelChipSize * dpr, 0, 0, panelChipSize * dpr, x * dpr, y * dpr);
+                    this.ctx.fill(p.shapePath2D, "evenodd");
+                    if (rowCounter === chipsPerRow) {
+                        rowCounter = 1;
+                        y += panelChipSpace;
+                        x = panelMargin + margin;
+                    }
+                    else {
+                        x += panelChipSpace;
+                        rowCounter++;
+                    }
+                }
+            }
         }
     }
-    newChipProtokoll(x, y, sendUpdate = false) {
-        const c = new Chip(x, y, this.activePlayer);
+    newChipProtokoll(c, sendUpdate = false) {
         this.chips.push(c);
-        this.checkForWinner(x, y);
+        this.checkForWinner(c.x, c.y, c.owner);
         this.chipsPlaced++;
         if (this.chipsPlaced === this.movesInRow) {
             this.activePlayer = (this.activePlayer + 1) % this.players.length;
@@ -315,7 +381,7 @@ export class Game {
         }
         return false;
     }
-    checkForWinner(x_i, y_i) {
+    checkForWinner(x_i, y_i, playerNumber) {
         let verticalCount = 1;
         let horizontalCount = 1;
         let diagonalOLUR = 1;
@@ -327,9 +393,8 @@ export class Game {
                 this.chips[i].x >= x_i - this.cnfw &&
                 this.chips[i].y <= y_i + this.cnfw &&
                 this.chips[i].y >= y_i - this.cnfw &&
-                this.chips[i].owner === this.playerNumber) {
+                this.chips[i].owner === playerNumber)
                 tempChipliste.push(this.chips[i]);
-            }
         }
         let pass = true;
         while (durchgang < this.cnfw && pass) {
@@ -429,7 +494,12 @@ export class Game {
         durchgang = 1;
         pass = true;
         if (verticalCount >= this.cnfw || horizontalCount >= this.cnfw || diagonalOLUR >= this.cnfw || diagonalULOR >= this.cnfw) {
+            this.winnerProtokol();
         }
+    }
+    winnerProtokol() {
+        this.boundaries.push(new Boundary(Array.from(this.chips)));
+        this.chips = [];
     }
     distance(x1, y1, x2, y2) {
         const d0 = x2 - x1;

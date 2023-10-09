@@ -124,8 +124,57 @@ class OtherPlayerPanel extends HTMLElement {
             throw new Error("No shape Path: " + player.shape);
         this.path.setAttributeNS(null, "d", shapePath);
         this.path.setAttributeNS(null, "fill", player.colorRGB.toString());
-        console.log(player.colorRGB.toString());
         this.playerReadyText.textContent = player.isPlayerReady ? "Ready" : "-";
     }
 }
 customElements.define("other-player-panel", OtherPlayerPanel);
+export class OverlayPanel extends HTMLElement {
+    static create(game) {
+        const p = document.createElement("overlay-panel");
+        const backButton = document.createElement("button");
+        backButton.setAttribute("class", "svgButton");
+        const backSvg = document.createElement("img");
+        backSvg.setAttribute("src", "back.svg");
+        backSvg.setAttribute("alt", "Back");
+        backButton.appendChild(backSvg);
+        backButton.addEventListener("click", e => {
+            game.webSocket.close();
+            document.location.href = document.location.origin;
+        });
+        p.appendChild(backButton);
+        const centerButton = document.createElement("button");
+        centerButton.setAttribute("class", "svgButton");
+        const centerSvg = document.createElement("img");
+        centerSvg.setAttribute("src", "center.svg");
+        centerSvg.setAttribute("alt", "Center");
+        centerButton.appendChild(centerSvg);
+        centerButton.addEventListener("click", e => {
+            game.center();
+        });
+        p.appendChild(centerButton);
+        if (document.fullscreenEnabled) {
+            const toggleFullScreen = document.createElement("button");
+            toggleFullScreen.setAttribute("class", "svgButton");
+            const fullscreenSvg = document.createElement("img");
+            fullscreenSvg.setAttribute("src", "fullscreen.svg");
+            fullscreenSvg.setAttribute("alt", "Toggle Fullscreen");
+            const miniscreen = document.createElement("img");
+            miniscreen.setAttribute("src", "miniscreen.svg");
+            miniscreen.setAttribute("alt", "Toggle Fullscreen");
+            toggleFullScreen.appendChild(fullscreenSvg);
+            toggleFullScreen.addEventListener("click", e => {
+                if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                    toggleFullScreen.replaceChild(fullscreenSvg, miniscreen);
+                }
+                else {
+                    document.body.requestFullscreen();
+                    toggleFullScreen.replaceChild(miniscreen, fullscreenSvg);
+                }
+            });
+            p.appendChild(toggleFullScreen);
+        }
+        return p;
+    }
+}
+customElements.define("overlay-panel", OverlayPanel);

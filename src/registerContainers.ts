@@ -12,36 +12,48 @@ export class NewGamePanel extends HTMLElement {
 
         const numberOfPlayerLabel = document.createElement("label");
         numberOfPlayerLabel.textContent = "Number of Players";
+        numberOfPlayerLabel.setAttribute("range", "2 - 7");
         ngp.appendChild(numberOfPlayerLabel);
 
         const numberOfPlayerInput = document.createElement("input");
         numberOfPlayerInput.setAttribute("type", "number");
+        numberOfPlayerInput.setAttribute("tabindex", "1");
         numberOfPlayerInput.value = String(2);
         ngp.appendChild(numberOfPlayerInput);
         numberOfPlayerInput.addEventListener("blur", e => {
-            numberOfPlayerInput.value = String(Math.min(Math.max(Number(numberOfPlayerInput.value), 2), 6));
+            numberOfPlayerInput.value = String(Math.min(Math.max(Math.round(Number(numberOfPlayerInput.value)), 2), 6));
         });
-
         ngp.appendChild(document.createElement("br"));
 
         const movesPerTurnLabel = document.createElement("label");
         movesPerTurnLabel.textContent = "Moves per Turn";
+        movesPerTurnLabel.setAttribute("range", "1 - 4");
         ngp.appendChild(movesPerTurnLabel);
+
 
         const movesPerTurnInput = document.createElement("input");
         movesPerTurnInput.setAttribute("type", "number");
+        movesPerTurnInput.setAttribute("tabindex", "2");
         movesPerTurnInput.value = String(1);
+        movesPerTurnInput.addEventListener("blur", e => {
+            movesPerTurnInput.value = String(Math.min(Math.max(Math.round(Number(movesPerTurnInput.value)), 1), 4));
+        });
         ngp.appendChild(movesPerTurnInput);
 
         ngp.appendChild(document.createElement("br"));
 
         const winConditionLabel = document.createElement("label");
         winConditionLabel.textContent = "Win Condition";
+        winConditionLabel.setAttribute("range", "4 - 7");
         ngp.appendChild(winConditionLabel);
 
         const winConditionInput = document.createElement("input");
         winConditionInput.setAttribute("type", "number");
+        winConditionInput.setAttribute("tabindex", "3");
         winConditionInput.value = String(4);
+        winConditionInput.addEventListener("blur", e => {
+            winConditionInput.value = String(Math.min(Math.max(Math.round(Number(winConditionInput.value)), 4), 7));
+        })
         ngp.appendChild(winConditionInput);
 
         ngp.appendChild(document.createElement("br"));
@@ -58,8 +70,9 @@ export class NewGamePanel extends HTMLElement {
 
         const startButton = document.createElement("button");
         startButton.textContent = "Start";
+        startButton.setAttribute("tabindex", "3");
         startButton.addEventListener("click", async (MouseEvent) => {
-            const ngr: req_newGame = { playerCount: Number(numberOfPlayerInput.value), movesPerTurn: Number(movesPerTurnInput.value), winCondition: Number(winConditionInput.value) };
+            const ngr: req_newGame = { playerCount: Number(numberOfPlayerInput.value) as ws_player_count, movesPerTurn: Number(movesPerTurnInput.value) as ws_move_in_row, winCondition: Number(winConditionInput.value) as ws_cnfw };
             const res = await fetch("/newGame", {
                 method: 'POST',
                 headers: {

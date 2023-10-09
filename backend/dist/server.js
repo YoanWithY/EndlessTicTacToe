@@ -108,58 +108,23 @@ function httpHandling(request, response) {
     }
     servFile(response, request.url);
 }
-const wsFunctions = {
-    updatePlayerData(webSocket, game, data) {
-        const playerData = data.player;
-        const player = game.players[playerData.playerNumber];
-        if (!player)
-            return;
-        player.update(playerData);
-        game.webSocketServer.clients.forEach((client) => {
-            if (client !== webSocket) {
-                const res = data;
-                client.send(JSON.stringify(res));
-            }
-        });
-    },
-    playerReady(webSocket, game, data) {
-        const players = game.players;
-        for (const p of players) {
-            if (!p)
-                return;
-            if (!p.ready)
-                return;
-        }
-        game.webSocketServer.clients.forEach((client) => {
-            const data = { command: "startGame" };
-            client.send(JSON.stringify(data));
-        });
-    },
-    newChip(webSocket, game, data) {
-        game.webSocketServer.clients.forEach((client) => {
-            if (client !== webSocket) {
-                const res = data;
-                client.send(JSON.stringify(res));
-            }
-        });
-    }
-};
 function httpUpgradeHandling(request, socket, head) {
     const urlString = request.url;
     if (!urlString) {
         socket.destroy();
-        throw new Error("Url does not exist!");
+        console.log("Game does not Exist.");
+        return;
     }
     const match = urlString.match(/\d+/g);
     if (!match || match.length === 0) {
         socket.destroy();
-        throw new Error("Could not process gameID.");
+        return;
     }
     const gameID = Number(match[0]);
     const game = game_1.games.get(gameID);
     if (!game) {
         socket.destroy();
-        throw new Error("Game does not exist!");
+        return;
     }
     game.webSocketServer.handleUpgrade(request, socket, head, (webSocket, request) => {
         const playerNumber = game.getFirstAvailablePlayerNumber();
@@ -174,23 +139,10 @@ function httpUpgradeHandling(request, socket, head) {
             if (game.migrateShape(s, player))
                 break;
         }
-        const res = { command: "connectAsPlayer", playerData: game.getAllPlayerData(), playerNumber: playerNumber, cdfw: game.winCondition, movesInRow: game.movesPerTurn };
-        webSocket.send(JSON.stringify(res));
-        const updateData = { command: "updatePlayerData", player: { playerNumber: playerNumber, name: player.name, color: player.color, isPlayerRead: player.ready, shape: player.shape } };
-        wsFunctions.updatePlayerData(webSocket, game, updateData);
-        webSocket.on("message", msg => {
-            const data = JSON.parse(String(msg));
-            if (!(data.command))
-                console.error("No ettt");
-            const fun = wsFunctions[data.command];
-            if (fun)
-                fun(webSocket, game, data);
-        });
-        webSocket.on("close", (code, reason) => {
-            console.log(`Game ${gameID}: Player ${playerNumber} closed connection.`);
+        const close = () => {
             game.giveBackShape(player.shape);
             const updateData = { command: "updatePlayerData", player: { playerNumber: playerNumber, name: "-", color: player.color, isPlayerRead: false, shape: "none" } };
-            wsFunctions.updatePlayerData(webSocket, game, updateData);
+            wsFunctions.updatePlayerData(updateData);
             game.players[playerNumber] = undefined;
             // check if any player is leaft
             for (const p of game.players)
@@ -203,6 +155,78 @@ function httpUpgradeHandling(request, socket, head) {
             game.webSocketServer.close();
             game_1.games.delete(game.gameID);
             console.log(`Terminated Game: ${game.gameID}`);
+        };
+        let lastPong;
+        let timerID;
+        const ping = () => {
+            const data = { command: "ping" };
+            webSocket.send(JSON.stringify(data));
+            const dt = Date.now() - lastPong;
+            if (dt > 3000) {
+                webSocket.close(1001, "heartbeatTimeout");
+                console.log("Close because of heartbeat timeout.");
+                close();
+            }
+            else
+                timerID = setTimeout(ping, 1000);
+        };
+        const wsFunctions = {
+            updatePlayerData(data) {
+                const playerData = data.player;
+                const player = game.players[playerData.playerNumber];
+                if (!player)
+                    return;
+                player.update(playerData);
+                game.webSocketServer.clients.forEach((client) => {
+                    if (client !== webSocket) {
+                        const res = data;
+                        client.send(JSON.stringify(res));
+                    }
+                });
+            },
+            playerReady(data) {
+                const players = game.players;
+                for (const p of players) {
+                    if (!p)
+                        return;
+                    if (!p.ready)
+                        return;
+                }
+                game.webSocketServer.clients.forEach((client) => {
+                    const data = { command: "startGame" };
+                    client.send(JSON.stringify(data));
+                });
+            },
+            newChip(data) {
+                game.webSocketServer.clients.forEach((client) => {
+                    if (client !== webSocket) {
+                        const res = data;
+                        client.send(JSON.stringify(res));
+                    }
+                });
+            },
+            pong(data) {
+                lastPong = Date.now();
+            }
+        };
+        webSocket.on("message", msg => {
+            const data = JSON.parse(String(msg));
+            if (!(data.command))
+                console.error("No ettt");
+            const fun = wsFunctions[data.command];
+            if (fun)
+                fun(data);
+        });
+        const res = { command: "connectAsPlayer", playerData: game.getAllPlayerData(), playerNumber: playerNumber, cdfw: game.winCondition, movesInRow: game.movesPerTurn };
+        webSocket.send(JSON.stringify(res));
+        const updateData = { command: "updatePlayerData", player: { playerNumber: playerNumber, name: player.name, color: player.color, isPlayerRead: player.ready, shape: player.shape } };
+        wsFunctions.updatePlayerData(updateData);
+        lastPong = Date.now();
+        ping();
+        webSocket.on("close", (code, reason) => {
+            clearTimeout(timerID);
+            console.log(`Game ${gameID}: Player ${playerNumber} closed connection.`);
+            close();
         });
     });
 }

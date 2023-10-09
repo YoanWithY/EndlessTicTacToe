@@ -1,7 +1,7 @@
 /// <reference path="../../shared/types.d.ts"/>
 import { HorizontalContainer, VerticalContainer } from "./containers.js";
 import { Color, Game, Player } from "./gameState.js";
-import { JoinGamePanel } from "./joinGameContainers.js";
+import { JoinGamePanel, OverlayPanel } from "./joinGameContainers.js";
 
 const canvas = document.createElement("canvas");
 canvas.setAttribute("id", "canvas");
@@ -9,12 +9,11 @@ document.body.appendChild(canvas);
 
 const wrapper = VerticalContainer.create();
 wrapper.setAttribute("id", "wrapper");
+document.body.appendChild(wrapper);
 
 const headline = document.createElement("h1");
 headline.textContent = "Endless Tic Tac Toe";
 wrapper.appendChild(headline);
-
-document.body.appendChild(wrapper);
 
 const ctx = canvas.getContext("2d") as CanvasRenderingContext2D;
 if (!ctx)
@@ -31,14 +30,13 @@ function wsSend<T>(data: T) {
 }
 
 webSocket.addEventListener("open", e => {
-    console.log("Opend Web socket connection:", e);
     const connectReq: ws_req_connection = { command: "connectionRequest" };
     wsSend<ws_req_connection>(connectReq);
 });
 
 webSocket.addEventListener("error", (e) => {
-    alert("WebSocket Error.");
-})
+    window.location.href = window.location.origin;
+});
 
 const players: Player[] = [];
 let game: Game;
@@ -74,40 +72,44 @@ const ws_all_functions: { [key: string]: (webSocket: WebSocket, data: any) => vo
     },
 }
 
-const ws_player_functions: { [key: string]: (webSocket: WebSocket, data: any) => void } = {
-    startGame(webSocket: WebSocket) {
-        game = new Game(webSocket, canvas, players, playerNumber, cnfw, movesInRow);
-        document.body.removeChild(wrapper);
-        game.render();
-    },
-    updatePlayerData(webSocket: WebSocket, data: ws_res_update_player_data) {
-        const newPlayerData = data.player;
-        if (newPlayerData.playerNumber === playerNumber)
-            return;
-
-        const player = players[newPlayerData.playerNumber];
-        player.setFromData(newPlayerData);
-
-        if (!joinGamePanel)
-            return;
-
-        const opp = joinGamePanel.otherPlayerPanels[player.playerNumber];
-        if (opp === null)
-            return;
-        opp.setFromPlayer(player);
-    },
-    newChip(webSocket: WebSocket, data: ws_res_new_chip) {
-        game.newChipProtokoll(data.chip.x, data.chip.y, false);
-        game.render();
-    }
-}
-
 webSocket.addEventListener("message", (ev: MessageEvent<any>) => {
+    const ws_player_functions: { [key: string]: (data: any) => void } = {
+        startGame() {
+            game = new Game(webSocket, canvas, players, playerNumber, cnfw, movesInRow);
+            const overlay = OverlayPanel.create(game);
+            document.body.replaceChild(overlay, wrapper);
+            game.render();
+        },
+        updatePlayerData(data: ws_res_update_player_data) {
+            const newPlayerData = data.player;
+            if (newPlayerData.playerNumber === playerNumber)
+                return;
+
+            const player = players[newPlayerData.playerNumber];
+            player.setFromData(newPlayerData);
+
+            if (!joinGamePanel)
+                return;
+
+            const opp = joinGamePanel.otherPlayerPanels[player.playerNumber];
+            if (opp === null)
+                return;
+            opp.setFromPlayer(player);
+        },
+        newChip(data: ws_res_new_chip) {
+            game.newChipProtokoll(data.chip, false);
+            game.render();
+        },
+        ping(data: ws_ping) {
+            wsSend<ws_pong>({ command: "pong" });
+        }
+    }
+
     const data = JSON.parse(ev.data) as ettt;
     if (playerNumber !== undefined) {
         const fun = ws_player_functions[data.command];
         if (fun)
-            fun(webSocket, data);
+            fun(data);
         return;
     }
 
