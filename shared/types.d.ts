@@ -31,15 +31,18 @@ type res_newGame = {
     gameID: number;
 }
 type ws_chip = { x: number, y: number, owner: number };
+type ws_boundary = { chips: ws_chip[] };
 type ws_close_reason = "serverIsFull"
 type ws_player_shape = "none" | "square" | "square_filled" | "circle" | "circle_filled" | "triangle" | "triangle_filled" | "cross";
 type ws_player_count = 2 | 3 | 4 | 5 | 6 | 7;
+type ws_player_status = "offline" | "online" | "ready";
 type ws_color = 0 | 1 | 2 | 3 | 4 | 5;
 type ws_cnfw = 4 | 5 | 6 | 7;
 type ws_move_in_row = 1 | 2 | 3 | 4;
-type ws_player_data = { name: string, color: ws_color, shape: ws_player_shape, playerNumber: number, isPlayerRead: boolean };
+type ws_player_data = { name: string, color: ws_color, shape: ws_player_shape, playerNumber: number, status: ws_plaer_status };
+type ws_game = { boundaries: ws_boundary[], chips: ws_chip[], activePlayer: number, chipsPlaced };
 type ws_command = "getAllPlayerData" | "connectAsPlayer" | "connectionRejected" |
-    "connectionRequest" | "updatePlayerData" | "playerReady" | "startGame" | "newChip" | "ping" | "pong";
+    "connectionRequest" | "updatePlayerData" | "playerReady" | "startGame" | "newChip" | "ping" | "pong" | "newBoundary" | "joinGame";
 type ettt = { command: ws_command };
 type ws_req_connection = ettt & {
     command: "connectionRequest";
@@ -67,9 +70,16 @@ type ws_req_new_chip = ettt & {
     command: "newChip";
     chip: ws_chip;
 }
+type ws_req_new_boundary = ettt & {
+    command: "newBoundary";
+}
 type ws_res_new_chip = ettt & {
     command: "newChip";
     chip: ws_chip;
+}
+type ws_res_join_game = ettt & {
+    command: "joinGame",
+    game: ws_game;
 }
 type ws_close_connection_reject = ws_close_reason & "serverIsFull";
 /**

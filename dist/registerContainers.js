@@ -74,7 +74,7 @@ export class NewGamePanel extends HTMLElement {
                 body: JSON.stringify(ngr)
             });
             const data = yield res.json();
-            window.location.href = window.location.origin + `/game/${data.gameID}`;
+            window.location.href = `${window.location.origin}/game/${data.gameID}`;
         }));
         hc.appendChild(startButton);
         ngp.appendChild(hc);

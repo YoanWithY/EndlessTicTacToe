@@ -81,7 +81,7 @@ export class NewGamePanel extends HTMLElement {
                 body: JSON.stringify(ngr)
             });
             const data = await res.json() as res_newGame;
-            window.location.href = window.location.origin + `/game/${data.gameID}`;
+            window.location.href = `${window.location.origin}/game/${data.gameID}`;
         });
         hc.appendChild(startButton);
 

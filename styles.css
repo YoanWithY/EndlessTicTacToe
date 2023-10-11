@@ -79,7 +79,13 @@ button {
     background-color: var(--b-l2);
 }
 
-@media (hover: hover) {
+button:active:not([disabled]) {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+    filter: drop-shadow(0 0 4px var(--accent-color));
+}
+
+@media (hover: none) {
     button:hover:not([disabled]) {
         background-color: var(--accent-color);
         border-color: var(--accent-color);
@@ -87,15 +93,6 @@ button {
         filter: drop-shadow(0 0 4px var(--accent-color));
     }
 }
-
-@media (hover: none) {
-    button:active:not([disabled]) {
-        background-color: var(--accent-color);
-        border-color: var(--accent-color);
-        filter: drop-shadow(0 0 4px var(--accent-color));
-    }
-}
-
 
 button:disabled {
     background-color: var(--b-l1);
@@ -200,7 +197,7 @@ img {
     flex-grow: 0;
     flex-shrink: 0;
     flex-basis: 40px;
-    background-color: var(--b-l1);
+    background-color: var(--b-l2);
 }
 
 .playerIcon {

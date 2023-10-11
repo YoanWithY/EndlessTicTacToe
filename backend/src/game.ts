@@ -1,15 +1,14 @@
 import * as WebSocket from "ws";
 
 export class Player {
-    webSocket: WebSocket;
+    webSocket?: WebSocket;
     name: string;
     color: ws_color;
     shape: ws_player_shape;
     playerNumber: number;
-    ready = false;
-    constructor(webSocket: WebSocket, playerName: string, playerNumber: number) {
-        this.webSocket = webSocket;
-        this.name = playerName;
+    status: ws_player_status = "offline";
+    constructor(playerNumber: number) {
+        this.name = `Player ${playerNumber + 1}`;
         this.playerNumber = playerNumber;
         this.color = playerNumber as ws_color;
         this.shape = "none";
@@ -19,7 +18,7 @@ export class Player {
         this.name = playerData.name;
         this.shape = playerData.shape;
         this.color = playerData.color;
-        this.ready = playerData.isPlayerRead;
+        this.status = playerData.status;
         this.playerNumber = this.playerNumber;
     }
 }
@@ -28,27 +27,50 @@ export const shapes: ws_player_shape[] = ["square_filled", "circle_filled", "tri
 export default class Game {
     availableShapes: Set<ws_player_shape> = new Set(shapes);
     gameID: number;
-    movesPerTurn: ws_move_in_row;
+    movesInRow: ws_move_in_row;
     playerCount: number;
     winCondition: ws_cnfw;
-    players: (Player | undefined)[] = [];
+    players: Player[] = [];
+    private chips: ws_chip[] = [];
+    activePlayer = 0;
+    chipsPlaced = 0;
+    boundaries: ws_boundary[] = [];
     webSocketServer = new WebSocket.Server({ noServer: true });
-    constructor(gameID: number, movesPerTurn: ws_move_in_row, playerCount: number, winCondition: ws_cnfw) {
+    isRunning = false;
+    constructor(gameID: number, movesInRow: ws_move_in_row, playerCount: number, winCondition: ws_cnfw) {
         this.gameID = gameID;
-        this.movesPerTurn = movesPerTurn;
+        this.movesInRow = movesInRow;
         this.playerCount = playerCount;
         this.winCondition = winCondition;
-        for (let i = 0; i < playerCount; i++)
-            this.players[i] = undefined;
+        for (let i = 0; i < playerCount; i++) {
+            this.players[i] = new Player(i);
+            for (const s of this.availableShapes) {
+                if (this.migrateShape(s, this.players[i]))
+                    break;
+            }
+        }
+        this.addChip({ x: 0, y: 0, owner: 0 });
+    }
+    getWSData(): ws_game {
+        return { boundaries: this.boundaries, chips: this.chips, activePlayer: this.activePlayer, chipsPlaced: this.chipsPlaced };
+    }
+    addBoundary() {
+        this.boundaries.push({ chips: this.chips });
+        this.chips = [];
+    }
+    addChip(chip: ws_chip) {
+        this.chips.push(chip);
+        this.chipsPlaced++;
+        if (this.chipsPlaced === this.movesInRow) {
+            this.activePlayer = (this.activePlayer + 1) % this.players.length;
+            this.chipsPlaced = 0;
+        }
     }
 
     getFirstAvailablePlayerNumber() {
-        for (let i = 0; i < this.playerCount; i++) {
-            if (this.players[i] === undefined) {
-                this.players[i] === null;
+        for (let i = 0; i < this.playerCount; i++)
+            if (this.players[i].status === "offline")
                 return i;
-            }
-        }
         return undefined;
     }
 
@@ -75,7 +97,7 @@ export default class Game {
         const d: ws_player_data[] = [];
         for (let i = 0; i < this.playerCount; i++) {
             const p = this.players[i];
-            d[i] = p ? { name: p.name, color: p.color, shape: p.shape, playerNumber: i, isPlayerRead: p.ready } : d[i] = { name: "-", color: 0, shape: "none", playerNumber: i, isPlayerRead: false };
+            d[i] = { name: p.name, color: p.color, shape: p.shape, playerNumber: i, status: p.status };
         }
         return d;
     }
@@ -84,12 +106,9 @@ export default class Game {
 export const games = new Map<number, Game>();
 
 export function genGame(movesPerTurn: ws_move_in_row, playerCount: number, winCondition: ws_cnfw): Game {
-    const mod = 10000;
-    let attempt = Date.now() % mod;
-    while (games.has(attempt)) {
-        attempt = Date.now() % mod;
-    }
-    const game = new Game(attempt, movesPerTurn, playerCount, winCondition);
-    games.set(attempt, game);
+    let i = 10;
+    while (games.has(i)) i++;
+    const game = new Game(i, movesPerTurn, playerCount, winCondition);
+    games.set(i, game);
     return game;
 }

@@ -3,10 +3,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.genGame = exports.games = exports.shapes = exports.Player = void 0;
 const WebSocket = require("ws");
 class Player {
-    constructor(webSocket, playerName, playerNumber) {
-        this.ready = false;
-        this.webSocket = webSocket;
-        this.name = playerName;
+    constructor(playerNumber) {
+        this.status = "offline";
+        this.name = `Player ${playerNumber + 1}`;
         this.playerNumber = playerNumber;
         this.color = playerNumber;
         this.shape = "none";
@@ -15,31 +14,54 @@ class Player {
         this.name = playerData.name;
         this.shape = playerData.shape;
         this.color = playerData.color;
-        this.ready = playerData.isPlayerRead;
+        this.status = playerData.status;
         this.playerNumber = this.playerNumber;
     }
 }
 exports.Player = Player;
 exports.shapes = ["square_filled", "circle_filled", "triangle_filled", "cross", "square", "circle", "triangle"];
 class Game {
-    constructor(gameID, movesPerTurn, playerCount, winCondition) {
+    constructor(gameID, movesInRow, playerCount, winCondition) {
         this.availableShapes = new Set(exports.shapes);
         this.players = [];
+        this.chips = [];
+        this.activePlayer = 0;
+        this.chipsPlaced = 0;
+        this.boundaries = [];
         this.webSocketServer = new WebSocket.Server({ noServer: true });
+        this.isRunning = false;
         this.gameID = gameID;
-        this.movesPerTurn = movesPerTurn;
+        this.movesInRow = movesInRow;
         this.playerCount = playerCount;
         this.winCondition = winCondition;
-        for (let i = 0; i < playerCount; i++)
-            this.players[i] = undefined;
-    }
-    getFirstAvailablePlayerNumber() {
-        for (let i = 0; i < this.playerCount; i++) {
-            if (this.players[i] === undefined) {
-                this.players[i] === null;
-                return i;
+        for (let i = 0; i < playerCount; i++) {
+            this.players[i] = new Player(i);
+            for (const s of this.availableShapes) {
+                if (this.migrateShape(s, this.players[i]))
+                    break;
             }
         }
+        this.addChip({ x: 0, y: 0, owner: 0 });
+    }
+    getWSData() {
+        return { boundaries: this.boundaries, chips: this.chips, activePlayer: this.activePlayer, chipsPlaced: this.chipsPlaced };
+    }
+    addBoundary() {
+        this.boundaries.push({ chips: this.chips });
+        this.chips = [];
+    }
+    addChip(chip) {
+        this.chips.push(chip);
+        this.chipsPlaced++;
+        if (this.chipsPlaced === this.movesInRow) {
+            this.activePlayer = (this.activePlayer + 1) % this.players.length;
+            this.chipsPlaced = 0;
+        }
+    }
+    getFirstAvailablePlayerNumber() {
+        for (let i = 0; i < this.playerCount; i++)
+            if (this.players[i].status === "offline")
+                return i;
         return undefined;
     }
     /**
@@ -62,7 +84,7 @@ class Game {
         const d = [];
         for (let i = 0; i < this.playerCount; i++) {
             const p = this.players[i];
-            d[i] = p ? { name: p.name, color: p.color, shape: p.shape, playerNumber: i, isPlayerRead: p.ready } : d[i] = { name: "-", color: 0, shape: "none", playerNumber: i, isPlayerRead: false };
+            d[i] = { name: p.name, color: p.color, shape: p.shape, playerNumber: i, status: p.status };
         }
         return d;
     }
@@ -70,13 +92,11 @@ class Game {
 exports.default = Game;
 exports.games = new Map();
 function genGame(movesPerTurn, playerCount, winCondition) {
-    const mod = 10000;
-    let attempt = Date.now() % mod;
-    while (exports.games.has(attempt)) {
-        attempt = Date.now() % mod;
-    }
-    const game = new Game(attempt, movesPerTurn, playerCount, winCondition);
-    exports.games.set(attempt, game);
+    let i = 10;
+    while (exports.games.has(i))
+        i++;
+    const game = new Game(i, movesPerTurn, playerCount, winCondition);
+    exports.games.set(i, game);
     return game;
 }
 exports.genGame = genGame;

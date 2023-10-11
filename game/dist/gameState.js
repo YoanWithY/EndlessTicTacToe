@@ -1,3 +1,4 @@
+import { wsSend } from "./main.js";
 export class Chip {
     constructor(x, y, owner) {
         this.x = x;
@@ -7,10 +8,10 @@ export class Chip {
 }
 export class Boundary {
     constructor(oc) {
-        this.minX = Number.MAX_VALUE;
-        this.minY = Number.MAX_VALUE;
-        this.maxX = Number.MIN_VALUE;
-        this.maxY = Number.MIN_VALUE;
+        this.minX = Infinity;
+        this.minY = Infinity;
+        this.maxX = -Infinity;
+        this.maxY = -Infinity;
         this.boundChip = oc;
         for (let c of this.boundChip) {
             if (c.x < this.minX)
@@ -22,10 +23,6 @@ export class Boundary {
             if (c.y > this.maxY)
                 this.maxY = c.y;
         }
-        this.maxX = this.maxX;
-        this.minX = this.minX;
-        this.maxY = this.maxY;
-        this.minY = this.minY;
         this.width = this.maxX - this.minX + 1;
         this.height = this.maxY - this.minY + 1;
     }
@@ -75,7 +72,7 @@ export const colors = [
     Color.fromHSV(5 / 6, 1, 1),
 ];
 export class Player {
-    constructor(playerName, color, playerIcon, playerNubmer, isPlayerReady) {
+    constructor(playerName, color, playerIcon, playerNubmer, status) {
         this.name = playerName;
         this.color = color;
         this.colorRGB = colors[color];
@@ -84,10 +81,10 @@ export class Player {
         this.shape = playerIcon;
         this.shapePath2D = new Path2D(shapePaths.get(playerIcon));
         this.playerNumber = playerNubmer;
-        this.isPlayerReady = isPlayerReady;
+        this.status = status;
     }
     getWSData() {
-        return { color: this.color, name: this.name, isPlayerRead: this.isPlayerReady, playerNumber: this.playerNumber, shape: this.shape };
+        return { color: this.color, name: this.name, status: this.status, playerNumber: this.playerNumber, shape: this.shape };
     }
     setFromData(newPlayerData) {
         this.name = newPlayerData.name;
@@ -98,7 +95,7 @@ export class Player {
         this.shape = newPlayerData.shape;
         this.shapePath2D = new Path2D(shapePaths.get(newPlayerData.shape));
         this.playerNumber = newPlayerData.playerNumber;
-        this.isPlayerReady = newPlayerData.isPlayerRead;
+        this.status = newPlayerData.status;
     }
 }
 export const shapePaths = new Map();
@@ -111,23 +108,31 @@ shapePaths.set("triangle_filled", "M 0.1,1 A 0.1,0.1,0,0,1,0.0105572809, 0.85527
 shapePaths.set("cross", "M 0.3585786437627, 0.5 L 0.0292893218813, 0.8292893218813 A 0.1,0.1,0,0,0,0.1707106781187, 0.9707106781187 L 0.5, 0.6414213562373 L 0.8292893218813, 0.9707106781187 A 0.1,0.1,0,0,0,0.9707106781187, 0.8292893218813 L 0.6414213562373, 0.5 L 0.9707106781187, 0.1707106781187 A 0.1,0.1,0,0,0,0.8292893218813, 0.0292893218813 L 0.5, 0.3585786437627 L 0.1707106781187, 0.0292893218813 A 0.1,0.1,0,0,0,0.0292893218813, 0.1707106781187");
 shapePaths.set("none", "M 0,0 L 1,1");
 export class Game {
-    constructor(websocket, canvas, players, playerNumber, cnfw, movesInRow) {
+    constructor(websocket, canvas, players, playerNumber, cnfw, movesInRow, game) {
         this.boundaries = [];
         this.chips = [];
-        this.s = 32;
+        this.s = 100;
         this.mx = 0;
         this.my = 0;
         this.isDragging = false;
         this.lastX = 0;
         this.lastY = 0;
-        this.activePlayer = 0;
-        this.chipsPlaced = 0;
         this.cnfw = cnfw;
         this.movesInRow = movesInRow;
         this.webSocket = websocket;
         this.playerNumber = playerNumber;
         this.players = players;
-        this.newChipProtokoll(new Chip(0, 0, 0), false);
+        if (game) {
+            this.chips = game.chips;
+            game.boundaries.forEach(b => this.boundaries.push(new Boundary(b.chips)));
+            this.activePlayer = game.activePlayer;
+            this.chipsPlaced = game.chipsPlaced;
+        }
+        else {
+            this.activePlayer = 0;
+            this.chipsPlaced = 0;
+            this.newChipProtokoll(new Chip(0, 0, 0), false);
+        }
         this.canvasZoom(1, 0, 0);
         this.canvas = canvas;
         const c = canvas.getContext("2d");
@@ -244,7 +249,7 @@ export class Game {
         const width = this.canvas.clientWidth;
         const height = this.canvas.clientHeight;
         const dpr = window.devicePixelRatio || 1;
-        const background = "rgb(12, 12, 12)";
+        const background = "rgb(0, 0, 0)";
         this.ctx.resetTransform();
         this.ctx.scale(dpr, dpr);
         this.ctx.fillStyle = background;
@@ -256,15 +261,15 @@ export class Game {
             this.ctx.fill(p.shapePath2D, "evenodd");
         };
         this.ctx.strokeStyle = "rgb(110, 110, 110)";
-        this.ctx.lineWidth = 2;
+        this.ctx.lineWidth = 1;
         for (let i = this.boundaries.length - 1; i >= 0; i--) {
             this.ctx.resetTransform();
             this.ctx.scale(dpr, dpr);
             const bound = this.boundaries[i];
             const x = bound.minX * this.s + this.mx;
             const y = bound.minY * this.s + this.my;
-            const w = (bound.maxX - bound.minX + 1) * this.s;
-            const h = (bound.maxY - bound.minY + 1) * this.s;
+            const w = bound.width * this.s;
+            const h = bound.height * this.s;
             this.ctx.fillStyle = "rgb(32, 32, 32)";
             this.ctx.fillRect(x, y, w, h);
             this.ctx.strokeRect(x + 0.5, y + 0.5, w, h);
@@ -274,7 +279,8 @@ export class Game {
         }
         this.ctx.resetTransform();
         this.ctx.scale(dpr, dpr);
-        this.ctx.lineWidth = 0.25;
+        this.ctx.lineWidth = 1;
+        this.ctx.strokeStyle = "rgba(110, 110, 110, 0.25)";
         for (let x = this.mx % this.s + 0.5; x < width; x += this.s) {
             this.ctx.beginPath();
             this.ctx.moveTo(x, 0.5);
@@ -333,15 +339,13 @@ export class Game {
     }
     newChipProtokoll(c, sendUpdate = false) {
         this.chips.push(c);
+        if (sendUpdate)
+            wsSend({ command: "newChip", chip: c });
         this.checkForWinner(c.x, c.y, c.owner);
         this.chipsPlaced++;
         if (this.chipsPlaced === this.movesInRow) {
             this.activePlayer = (this.activePlayer + 1) % this.players.length;
             this.chipsPlaced = 0;
-        }
-        if (sendUpdate) {
-            const data = { command: "newChip", chip: c };
-            this.webSocket.send(JSON.stringify(data));
         }
     }
     isInsdeBounds(x_cord, y_cord) {
@@ -500,6 +504,7 @@ export class Game {
     winnerProtokol() {
         this.boundaries.push(new Boundary(Array.from(this.chips)));
         this.chips = [];
+        wsSend({ command: "newBoundary" });
     }
     distance(x1, y1, x2, y2) {
         const d0 = x2 - x1;

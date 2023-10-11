@@ -1,6 +1,6 @@
 /// <reference path="../../shared/types.d.ts"/>
 import { HorizontalContainer, VerticalContainer } from "./containers.js";
-import { Color, Game, Player } from "./gameState.js";
+import { Game, Player } from "./gameState.js";
 import { JoinGamePanel, OverlayPanel } from "./joinGameContainers.js";
 
 const canvas = document.createElement("canvas");
@@ -25,7 +25,11 @@ if (isNaN(gameID))
 
 const webSocket = new WebSocket(window.location.href.replace("http", "ws"), "ettt");
 
-function wsSend<T>(data: T) {
+export function wsSend<T>(data: T) {
+    if (webSocket.readyState === WebSocket.CLOSED) {
+        alert("You are not connected to the game. You are going back to the main page.");
+        window.location.href = window.location.origin;
+    }
     webSocket.send(JSON.stringify(data));
 }
 
@@ -62,7 +66,7 @@ const ws_all_functions: { [key: string]: (webSocket: WebSocket, data: any) => vo
         const playerData = data.playerData;
         for (let i = 0; i < playerData.length; i++) {
             const p = playerData[i];
-            players[i] = new Player(p.name, p.color, p.shape, p.playerNumber, p.isPlayerRead);
+            players[i] = new Player(p.name, p.color, p.shape, p.playerNumber, p.status);
         }
         playerNumber = data.playerNumber;
         cnfw = data.cdfw;
@@ -72,8 +76,27 @@ const ws_all_functions: { [key: string]: (webSocket: WebSocket, data: any) => vo
     },
 }
 
+let lastPing = Date.now();
+const evalPing = () => {
+    const dt = Date.now() - lastPing;
+    if (dt > 3000) {
+        webSocket.close();
+        alert("The connection to the server does not seam to work. You are being redirected to the main page.");
+        window.location.href = window.location.origin;
+    } else {
+        setTimeout(evalPing, 2000);
+    }
+}
+evalPing();
+
 webSocket.addEventListener("message", (ev: MessageEvent<any>) => {
     const ws_player_functions: { [key: string]: (data: any) => void } = {
+        joinGame(data: ws_res_join_game) {
+            game = new Game(webSocket, canvas, players, playerNumber, cnfw, movesInRow, data.game);
+            const overlay = OverlayPanel.create(game);
+            document.body.replaceChild(overlay, wrapper);
+            game.render();
+        },
         startGame() {
             game = new Game(webSocket, canvas, players, playerNumber, cnfw, movesInRow);
             const overlay = OverlayPanel.create(game);
@@ -102,6 +125,7 @@ webSocket.addEventListener("message", (ev: MessageEvent<any>) => {
         },
         ping(data: ws_ping) {
             wsSend<ws_pong>({ command: "pong" });
+            lastPing = Date.now();
         }
     }
 

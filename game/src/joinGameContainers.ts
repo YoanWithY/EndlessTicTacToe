@@ -1,5 +1,4 @@
 /// <reference path="../../shared/types.d.ts" />
-import { HorizontalContainer } from "./containers.js";
 import { Color, Game, Player, shapePaths } from "./gameState.js";
 
 function updatePlayerData(webSocket: WebSocket, player: Player) {
@@ -43,7 +42,7 @@ export class JoinGamePanel extends HTMLElement {
         readyButton.textContent = "Ready";
         readyButton.addEventListener("click", e => {
             const p = players[playerNumber];
-            p.isPlayerReady = true;
+            p.status = "ready";
             updatePlayerData(webSocket, p);
             readyButton.disabled = true;
             thisPlayerPanel.nameInput.disabled = true;
@@ -140,7 +139,7 @@ class OtherPlayerPanel extends HTMLElement {
         p.playerNameText = playerNameText;
 
         const playerReadyText = document.createElement("span");
-        playerReadyText.textContent = player.isPlayerReady ? "Ready" : "-";
+        playerReadyText.textContent = player.status;
         playerReadyText.setAttribute("class", "playerReady");
         p.appendChild(playerReadyText);
         p.playerReadyText = playerReadyText;
@@ -155,7 +154,7 @@ class OtherPlayerPanel extends HTMLElement {
             throw new Error("No shape Path: " + player.shape);
         this.path.setAttributeNS(null, "d", shapePath);
         this.path.setAttributeNS(null, "fill", player.colorRGB.toString());
-        this.playerReadyText.textContent = player.isPlayerReady ? "Ready" : "-";
+        this.playerReadyText.textContent = player.status;
     }
 }
 customElements.define("other-player-panel", OtherPlayerPanel);

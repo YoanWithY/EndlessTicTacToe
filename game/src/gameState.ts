@@ -1,3 +1,5 @@
+import { wsSend } from "./main.js";
+
 export class Chip {
 
     x: number;
@@ -14,16 +16,15 @@ export class Chip {
 export class Boundary {
 
     boundChip: Chip[];
-    minX = Number.MAX_VALUE;
-    minY = Number.MAX_VALUE;
-    maxX = Number.MIN_VALUE;
-    maxY = Number.MIN_VALUE;
+    minX = Infinity;
+    minY = Infinity
+    maxX = -Infinity;
+    maxY = -Infinity;
     width: number;
     height: number;
 
     constructor(oc: Chip[]) {
         this.boundChip = oc;
-
         for (let c of this.boundChip) {
             if (c.x < this.minX)
                 this.minX = c.x;
@@ -34,11 +35,6 @@ export class Boundary {
             if (c.y > this.maxY)
                 this.maxY = c.y;
         }
-
-        this.maxX = this.maxX;
-        this.minX = this.minX;
-        this.maxY = this.maxY;
-        this.minY = this.minY;
         this.width = this.maxX - this.minX + 1;
         this.height = this.maxY - this.minY + 1;
     }
@@ -111,9 +107,9 @@ export class Player {
     shape: ws_player_shape
     shapePath2D: Path2D;
     playerNumber: number;
-    isPlayerReady: boolean;
+    status: ws_player_status;
 
-    constructor(playerName: string, color: ws_color, playerIcon: ws_player_shape, playerNubmer: number, isPlayerReady: boolean) {
+    constructor(playerName: string, color: ws_color, playerIcon: ws_player_shape, playerNubmer: number, status: ws_player_status) {
         this.name = playerName;
         this.color = color;
         this.colorRGB = colors[color];
@@ -122,11 +118,11 @@ export class Player {
         this.shape = playerIcon;
         this.shapePath2D = new Path2D(shapePaths.get(playerIcon));
         this.playerNumber = playerNubmer;
-        this.isPlayerReady = isPlayerReady
+        this.status = status;
     }
 
     getWSData(): ws_player_data {
-        return { color: this.color, name: this.name, isPlayerRead: this.isPlayerReady, playerNumber: this.playerNumber, shape: this.shape };
+        return { color: this.color, name: this.name, status: this.status, playerNumber: this.playerNumber, shape: this.shape };
     }
 
     setFromData(newPlayerData: ws_player_data) {
@@ -138,7 +134,7 @@ export class Player {
         this.shape = newPlayerData.shape;
         this.shapePath2D = new Path2D(shapePaths.get(newPlayerData.shape));
         this.playerNumber = newPlayerData.playerNumber;
-        this.isPlayerReady = newPlayerData.isPlayerRead;
+        this.status = newPlayerData.status;
     }
 }
 
@@ -157,7 +153,7 @@ export class Game {
     boundaries: Boundary[] = [];
     chips: Chip[] = [];
 
-    s = 32;
+    s = 100;
     mx = 0;
     my = 0;
     isDragging = false;
@@ -175,16 +171,26 @@ export class Game {
     canvas: HTMLCanvasElement;
     ctx: CanvasRenderingContext2D;
 
-    activePlayer = 0;
-    chipsPlaced = 0;
+    activePlayer: number;
+    chipsPlaced: number;
 
-    constructor(websocket: WebSocket, canvas: HTMLCanvasElement, players: Player[], playerNumber: number, cnfw: ws_cnfw, movesInRow: ws_move_in_row) {
+    constructor(websocket: WebSocket, canvas: HTMLCanvasElement, players: Player[], playerNumber: number, cnfw: ws_cnfw, movesInRow: ws_move_in_row, game?: ws_game) {
         this.cnfw = cnfw;
         this.movesInRow = movesInRow;
         this.webSocket = websocket;
         this.playerNumber = playerNumber;
         this.players = players;
-        this.newChipProtokoll(new Chip(0, 0, 0), false);
+        if (game) {
+            this.chips = game.chips;
+            game.boundaries.forEach(b => this.boundaries.push(new Boundary(b.chips)));
+            this.activePlayer = game.activePlayer;
+            this.chipsPlaced = game.chipsPlaced;
+        } else {
+            this.activePlayer = 0;
+            this.chipsPlaced = 0;
+            this.newChipProtokoll(new Chip(0, 0, 0), false);
+        }
+
         this.canvasZoom(1, 0, 0);
         this.canvas = canvas;
         const c = canvas.getContext("2d");
@@ -315,12 +321,11 @@ export class Game {
         const width = this.canvas.clientWidth;
         const height = this.canvas.clientHeight;
         const dpr = window.devicePixelRatio || 1;
-        const background = "rgb(12, 12, 12)"
+        const background = "rgb(0, 0, 0)"
         this.ctx.resetTransform();
         this.ctx.scale(dpr, dpr);
         this.ctx.fillStyle = background;
         this.ctx.fillRect(0, 0, width, height);
-
 
         const chipSize = this.s - 9;
 
@@ -333,7 +338,7 @@ export class Game {
 
         // draw boundaries
         this.ctx.strokeStyle = "rgb(110, 110, 110)";
-        this.ctx.lineWidth = 2;
+        this.ctx.lineWidth = 1;
 
         for (let i = this.boundaries.length - 1; i >= 0; i--) {
             this.ctx.resetTransform();
@@ -341,8 +346,8 @@ export class Game {
             const bound = this.boundaries[i];
             const x = bound.minX * this.s + this.mx;
             const y = bound.minY * this.s + this.my;
-            const w = (bound.maxX - bound.minX + 1) * this.s;
-            const h = (bound.maxY - bound.minY + 1) * this.s
+            const w = bound.width * this.s;
+            const h = bound.height * this.s
             this.ctx.fillStyle = "rgb(32, 32, 32)";
             this.ctx.fillRect(x, y, w, h);
             this.ctx.strokeRect(x + 0.5, y + 0.5, w, h);
@@ -355,7 +360,8 @@ export class Game {
         this.ctx.scale(dpr, dpr);
 
         // draw grid
-        this.ctx.lineWidth = 0.25;
+        this.ctx.lineWidth = 1;
+        this.ctx.strokeStyle = "rgba(110, 110, 110, 0.25)";
         for (let x = this.mx % this.s + 0.5; x < width; x += this.s) {
             this.ctx.beginPath();
             this.ctx.moveTo(x, 0.5);
@@ -421,6 +427,9 @@ export class Game {
 
     newChipProtokoll(c: Chip, sendUpdate = false) {
         this.chips.push(c);
+        if (sendUpdate)
+            wsSend<ws_req_new_chip>({ command: "newChip", chip: c });
+
         this.checkForWinner(c.x, c.y, c.owner);
 
         this.chipsPlaced++;
@@ -429,10 +438,7 @@ export class Game {
             this.chipsPlaced = 0;
         }
 
-        if (sendUpdate) {
-            const data: ws_req_new_chip = { command: "newChip", chip: c };
-            this.webSocket.send(JSON.stringify(data));
-        }
+
     }
 
     /**
@@ -655,6 +661,7 @@ export class Game {
     winnerProtokol() {
         this.boundaries.push(new Boundary(Array.from(this.chips)));
         this.chips = [];
+        wsSend<ws_req_new_boundary>({ command: "newBoundary" });
     }
 
     distance(x1: number, y1: number, x2: number, y2: number): number {
