@@ -394,7 +394,7 @@ export class Game {
             this.ctx.resetTransform();
             this.ctx.scale(dpr, dpr);
             let x = panelMargin;
-            let y = height - panelMargin - totalRows * panelChipSpace;
+            let y = panelMargin;
             this.ctx.fillStyle = background;
             this.ctx.strokeStyle = "rgb(32, 32, 128)";
             this.ctx.lineWidth = 1;
