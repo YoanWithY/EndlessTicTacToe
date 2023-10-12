@@ -32,13 +32,26 @@ export function wsSend<T>(data: T) {
     }
     webSocket.send(JSON.stringify(data));
 }
-
+let lastPing = Date.now();
 webSocket.addEventListener("open", e => {
     const connectReq: ws_req_connection = { command: "connectionRequest" };
     wsSend<ws_req_connection>(connectReq);
+
+    const evalPing = () => {
+        const dt = Date.now() - lastPing;
+        if (dt > 3000) {
+            webSocket.close();
+            alert("The connection to the server does not seam to work. You are being redirected to the main page.");
+            window.location.href = window.location.origin;
+        } else {
+            setTimeout(evalPing, 2000);
+        }
+    }
+    evalPing();
 });
 
 webSocket.addEventListener("error", (e) => {
+    alert("The game you request does not exist. You will be redirecet to the main Page.");
     window.location.href = window.location.origin;
 });
 
@@ -75,19 +88,6 @@ const ws_all_functions: { [key: string]: (webSocket: WebSocket, data: any) => vo
         wrapper.appendChild(joinGamePanel);
     },
 }
-
-let lastPing = Date.now();
-const evalPing = () => {
-    const dt = Date.now() - lastPing;
-    if (dt > 3000) {
-        webSocket.close();
-        alert("The connection to the server does not seam to work. You are being redirected to the main page.");
-        window.location.href = window.location.origin;
-    } else {
-        setTimeout(evalPing, 2000);
-    }
-}
-evalPing();
 
 webSocket.addEventListener("message", (ev: MessageEvent<any>) => {
     const ws_player_functions: { [key: string]: (data: any) => void } = {

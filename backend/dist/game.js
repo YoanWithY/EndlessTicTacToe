@@ -92,11 +92,25 @@ class Game {
 exports.default = Game;
 exports.games = new Map();
 function genGame(movesPerTurn, playerCount, winCondition) {
-    let i = 10;
+    let i = 0;
     while (exports.games.has(i))
         i++;
     const game = new Game(i, movesPerTurn, playerCount, winCondition);
     exports.games.set(i, game);
+    const destroy = setInterval(() => {
+        // check if any player is leaft
+        for (const p of game.players)
+            if (p.status !== "offline")
+                return;
+        clearInterval(destroy);
+        // if not close the game
+        game.webSocketServer.clients.forEach(ws => {
+            ws.close();
+        });
+        game.webSocketServer.close();
+        exports.games.delete(game.gameID);
+        console.log(`Terminated Game: ${game.gameID}`);
+    }, 100000);
     return game;
 }
 exports.genGame = genGame;

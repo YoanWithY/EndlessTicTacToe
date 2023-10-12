@@ -82,7 +82,6 @@ const httpFunctions: { [key: string]: (reques: http.IncomingMessage, response: R
 
         const data = await bodyAsObject<req_newGame>(request);
         const game = genGame(data.movesPerTurn, data.playerCount, data.winCondition);
-        games.set(game.gameID, game);
         console.log(`Created new game with ID: ${game.gameID} and ${game.playerCount} players.`);
         servJson<res_newGame>(response, { gameID: game.gameID });
     },
@@ -98,15 +97,6 @@ const httpFunctions: { [key: string]: (reques: http.IncomingMessage, response: R
             servFile(response, request.url);
             return;
         }
-
-        const game = games.get(num);
-        if (!game) {
-            console.log(`The game ID ${num} is unknown.`);
-            response.writeHead(301, { 'Location': '/' });
-            response.end();
-            return;
-        }
-
         servFile(response, "game/game.html");
     }
 }
@@ -229,24 +219,9 @@ function httpUpgradeHandling(request: http.IncomingMessage, socket: net.Socket, 
         });
 
         const close = () => {
-            const p = game.players[playerNumber];
-
-            p.status = "offline";
-            const data: ws_req_update_player_data = { command: "updatePlayerData", player: p };
+            player.status = "offline";
+            const data: ws_req_update_player_data = { command: "updatePlayerData", player: player };
             wsFunctions.updatePlayerData(data);
-
-            // check if any player is leaft
-            for (const p of game.players)
-                if (p.status !== "offline")
-                    return;
-
-            // if not close the game
-            game.webSocketServer.clients.forEach(ws => {
-                ws.close();
-            })
-            game.webSocketServer.close();
-            games.delete(game.gameID);
-            console.log(`Terminated Game: ${game.gameID}`);
         }
 
         let lastPong: number;

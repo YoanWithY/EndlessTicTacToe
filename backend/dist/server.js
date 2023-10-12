@@ -67,7 +67,6 @@ const httpFunctions = {
         }
         const data = await (0, bodyParse_1.bodyAsObject)(request);
         const game = (0, game_1.genGame)(data.movesPerTurn, data.playerCount, data.winCondition);
-        game_1.games.set(game.gameID, game);
         console.log(`Created new game with ID: ${game.gameID} and ${game.playerCount} players.`);
         servJson(response, { gameID: game.gameID });
     },
@@ -80,13 +79,6 @@ const httpFunctions = {
         const num = Number.parseInt(urlArr[1]);
         if (isNaN(num)) {
             servFile(response, request.url);
-            return;
-        }
-        const game = game_1.games.get(num);
-        if (!game) {
-            console.log(`The game ID ${num} is unknown.`);
-            response.writeHead(301, { 'Location': '/' });
-            response.end();
             return;
         }
         servFile(response, "game/game.html");
@@ -195,21 +187,9 @@ function httpUpgradeHandling(request, socket, head) {
                 fun(data);
         });
         const close = () => {
-            const p = game.players[playerNumber];
-            p.status = "offline";
-            const data = { command: "updatePlayerData", player: p };
+            player.status = "offline";
+            const data = { command: "updatePlayerData", player: player };
             wsFunctions.updatePlayerData(data);
-            // check if any player is leaft
-            for (const p of game.players)
-                if (p.status !== "offline")
-                    return;
-            // if not close the game
-            game.webSocketServer.clients.forEach(ws => {
-                ws.close();
-            });
-            game.webSocketServer.close();
-            game_1.games.delete(game.gameID);
-            console.log(`Terminated Game: ${game.gameID}`);
         };
         let lastPong;
         let timerID;

@@ -24,11 +24,25 @@ export function wsSend(data) {
     }
     webSocket.send(JSON.stringify(data));
 }
+let lastPing = Date.now();
 webSocket.addEventListener("open", e => {
     const connectReq = { command: "connectionRequest" };
     wsSend(connectReq);
+    const evalPing = () => {
+        const dt = Date.now() - lastPing;
+        if (dt > 3000) {
+            webSocket.close();
+            alert("The connection to the server does not seam to work. You are being redirected to the main page.");
+            window.location.href = window.location.origin;
+        }
+        else {
+            setTimeout(evalPing, 2000);
+        }
+    };
+    evalPing();
 });
 webSocket.addEventListener("error", (e) => {
+    alert("The game you request does not exist. You will be redirecet to the main Page.");
     window.location.href = window.location.origin;
 });
 const players = [];
@@ -60,19 +74,6 @@ const ws_all_functions = {
         wrapper.appendChild(joinGamePanel);
     },
 };
-let lastPing = Date.now();
-const evalPing = () => {
-    const dt = Date.now() - lastPing;
-    if (dt > 3000) {
-        webSocket.close();
-        alert("The connection to the server does not seam to work. You are being redirected to the main page.");
-        window.location.href = window.location.origin;
-    }
-    else {
-        setTimeout(evalPing, 2000);
-    }
-};
-evalPing();
 webSocket.addEventListener("message", (ev) => {
     const ws_player_functions = {
         joinGame(data) {
