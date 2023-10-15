@@ -106,7 +106,7 @@ export default class Game {
 export const games = new Map<number, Game>();
 
 export function genGame(movesPerTurn: ws_move_in_row, playerCount: number, winCondition: ws_cnfw): Game {
-    let i = 0;
+    let i = 110;
     while (games.has(i)) i++;
     const game = new Game(i, movesPerTurn, playerCount, winCondition);
     games.set(i, game);

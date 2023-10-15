@@ -19,8 +19,10 @@ if (isNaN(gameID))
 const webSocket = new WebSocket(window.location.href.replace("http", "ws"), "ettt");
 export function wsSend(data) {
     if (webSocket.readyState === WebSocket.CLOSED) {
-        alert("You are not connected to the game. You are going back to the main page.");
-        window.location.href = window.location.origin;
+        if (confirm("You are not connected to the game. I will try to reconnect."))
+            location.reload();
+        else
+            window.location.href = window.location.origin;
     }
     webSocket.send(JSON.stringify(data));
 }
@@ -28,18 +30,17 @@ let lastPing = Date.now();
 webSocket.addEventListener("open", e => {
     const connectReq = { command: "connectionRequest" };
     wsSend(connectReq);
-    const evalPing = () => {
+    const interval = setInterval(() => {
         const dt = Date.now() - lastPing;
-        if (dt > 3000) {
+        if (dt > 3000 || webSocket.readyState === WebSocket.CLOSED) {
             webSocket.close();
-            alert("The connection to the server does not seam to work. You are being redirected to the main page.");
-            window.location.href = window.location.origin;
+            if (confirm("The connection to the server ist interrupted. I will try to reconnect."))
+                location.reload();
+            else
+                window.location.href = window.location.origin;
+            clearInterval(interval);
         }
-        else {
-            setTimeout(evalPing, 2000);
-        }
-    };
-    evalPing();
+    }, 100);
 });
 webSocket.addEventListener("error", (e) => {
     alert("The game you request does not exist. You will be redirecet to the main Page.");

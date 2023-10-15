@@ -1,9 +1,62 @@
 /// <reference path="../shared/types.d.ts" />
 import { HorizontalContainer } from "./containers.js";
 
+class NewGameInfoPanel extends HTMLElement {
+    static create(gameID: number, wrapper: HTMLElement, newGamePanel: NewGamePanel) {
+        const p = document.createElement("new-game-info-panel") as NewGameInfoPanel;
+
+        const linkPanel = document.createElement("horizontal-container") as HorizontalContainer;
+        const linkStr = `${window.location.origin}/game/${gameID}`;
+
+        const h2 = document.createElement("h2");
+        h2.textContent = `Your Game ID: ${gameID}`;
+        linkPanel.appendChild(h2);
+
+        const copyToClipboardImage = document.createElement("img");
+        copyToClipboardImage.setAttribute("src", "./copytoclipboard.svg");
+        copyToClipboardImage.setAttribute("alt", "Copy to Clipboard");
+
+        const copyToolTip = document.createElement("div");
+        copyToolTip.classList.add("tooltip");
+        copyToolTip.textContent = "Copied to Clipboard";
+
+        const copyToClipboardButton = document.createElement("button");
+        copyToClipboardButton.setAttribute("class", "svgButton");
+        copyToClipboardButton.appendChild(copyToClipboardImage);
+        copyToClipboardButton.addEventListener("click", e => {
+            navigator.clipboard.writeText(linkStr);
+            copyToClipboardButton.appendChild(copyToolTip);
+            setTimeout(() => {
+                copyToClipboardButton.removeChild(copyToolTip);
+            }, 2000);
+        });
+
+        linkPanel.appendChild(copyToClipboardButton)
+        p.appendChild(linkPanel);
+
+        const hc = document.createElement("horizontal-container") as HorizontalContainer;
+
+        const backButton = document.createElement("button");
+        backButton.addEventListener("click", e => window.location.href = window.location.origin);
+        backButton.textContent = "Back to Main";
+        hc.appendChild(backButton);
+
+        const joinButton = document.createElement("button");
+        joinButton.textContent = "Join";
+        joinButton.addEventListener("click", e => window.location.href = linkStr);
+        hc.appendChild(joinButton);
+
+        p.appendChild(document.createElement("br"));
+
+        p.appendChild(hc);
+        return p;
+    }
+}
+customElements.define("new-game-info-panel", NewGameInfoPanel);
+
 export class NewGamePanel extends HTMLElement {
     static create(gameRegistration: HTMLElement, wrapper: HTMLElement): NewGamePanel {
-        const ngp = document.createElement("new-game-panel");
+        const ngp = document.createElement("new-game-panel") as NewGamePanel;
         ngp.setAttribute("class", "verticalContainer");
 
         const title = document.createElement("h2");
@@ -81,7 +134,8 @@ export class NewGamePanel extends HTMLElement {
                 body: JSON.stringify(ngr)
             });
             const data = await res.json() as res_newGame;
-            window.location.href = `${window.location.origin}/game/${data.gameID}`;
+            const ngip = NewGameInfoPanel.create(data.gameID, wrapper, ngp) as NewGameInfoPanel;
+            wrapper.replaceChild(ngip, ngp);
         });
         hc.appendChild(startButton);
 

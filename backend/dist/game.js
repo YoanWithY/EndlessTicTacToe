@@ -92,7 +92,7 @@ class Game {
 exports.default = Game;
 exports.games = new Map();
 function genGame(movesPerTurn, playerCount, winCondition) {
-    let i = 0;
+    let i = 110;
     while (exports.games.has(i))
         i++;
     const game = new Game(i, movesPerTurn, playerCount, winCondition);

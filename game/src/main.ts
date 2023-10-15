@@ -27,8 +27,8 @@ const webSocket = new WebSocket(window.location.href.replace("http", "ws"), "ett
 
 export function wsSend<T>(data: T) {
     if (webSocket.readyState === WebSocket.CLOSED) {
-        alert("You are not connected to the game. You are going back to the main page.");
-        window.location.href = window.location.origin;
+        if (confirm("You are not connected to the game. I will try to reconnect.")) location.reload();
+        else window.location.href = window.location.origin;
     }
     webSocket.send(JSON.stringify(data));
 }
@@ -37,17 +37,15 @@ webSocket.addEventListener("open", e => {
     const connectReq: ws_req_connection = { command: "connectionRequest" };
     wsSend<ws_req_connection>(connectReq);
 
-    const evalPing = () => {
+    const interval = setInterval(() => {
         const dt = Date.now() - lastPing;
-        if (dt > 3000) {
+        if (dt > 3000 || webSocket.readyState === WebSocket.CLOSED) {
             webSocket.close();
-            alert("The connection to the server does not seam to work. You are being redirected to the main page.");
-            window.location.href = window.location.origin;
-        } else {
-            setTimeout(evalPing, 2000);
+            if (confirm("The connection to the server ist interrupted. I will try to reconnect.")) location.reload();
+            else window.location.href = window.location.origin;
+            clearInterval(interval);
         }
-    }
-    evalPing();
+    }, 100);
 });
 
 webSocket.addEventListener("error", (e) => {

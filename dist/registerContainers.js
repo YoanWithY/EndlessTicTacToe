@@ -8,6 +8,47 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 import { HorizontalContainer } from "./containers.js";
+class NewGameInfoPanel extends HTMLElement {
+    static create(gameID, wrapper, newGamePanel) {
+        const p = document.createElement("new-game-info-panel");
+        const linkPanel = document.createElement("horizontal-container");
+        const linkStr = `${window.location.origin}/game/${gameID}`;
+        const h2 = document.createElement("h2");
+        h2.textContent = `Your Game ID: ${gameID}`;
+        linkPanel.appendChild(h2);
+        const copyToClipboardImage = document.createElement("img");
+        copyToClipboardImage.setAttribute("src", "./copytoclipboard.svg");
+        copyToClipboardImage.setAttribute("alt", "Copy to Clipboard");
+        const copyToolTip = document.createElement("div");
+        copyToolTip.classList.add("tooltip");
+        copyToolTip.textContent = "Copied to Clipboard";
+        const copyToClipboardButton = document.createElement("button");
+        copyToClipboardButton.setAttribute("class", "svgButton");
+        copyToClipboardButton.appendChild(copyToClipboardImage);
+        copyToClipboardButton.addEventListener("click", e => {
+            navigator.clipboard.writeText(linkStr);
+            copyToClipboardButton.appendChild(copyToolTip);
+            setTimeout(() => {
+                copyToClipboardButton.removeChild(copyToolTip);
+            }, 2000);
+        });
+        linkPanel.appendChild(copyToClipboardButton);
+        p.appendChild(linkPanel);
+        const hc = document.createElement("horizontal-container");
+        const backButton = document.createElement("button");
+        backButton.addEventListener("click", e => window.location.href = window.location.origin);
+        backButton.textContent = "Back to Main";
+        hc.appendChild(backButton);
+        const joinButton = document.createElement("button");
+        joinButton.textContent = "Join";
+        joinButton.addEventListener("click", e => window.location.href = linkStr);
+        hc.appendChild(joinButton);
+        p.appendChild(document.createElement("br"));
+        p.appendChild(hc);
+        return p;
+    }
+}
+customElements.define("new-game-info-panel", NewGameInfoPanel);
 export class NewGamePanel extends HTMLElement {
     static create(gameRegistration, wrapper) {
         const ngp = document.createElement("new-game-panel");
@@ -74,7 +115,8 @@ export class NewGamePanel extends HTMLElement {
                 body: JSON.stringify(ngr)
             });
             const data = yield res.json();
-            window.location.href = `${window.location.origin}/game/${data.gameID}`;
+            const ngip = NewGameInfoPanel.create(data.gameID, wrapper, ngp);
+            wrapper.replaceChild(ngip, ngp);
         }));
         hc.appendChild(startButton);
         ngp.appendChild(hc);

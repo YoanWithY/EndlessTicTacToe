@@ -10,28 +10,9 @@ export class JoinGamePanel extends HTMLElement {
     }
     static create(wrapper, players, gameID, playerNumber, webSocket) {
         const jgp = document.createElement("join-game-panel");
-        const h_wrap = document.createElement("horizontal-container");
         const title = document.createElement("h2");
         title.textContent = `Join Game: ${gameID}`;
-        h_wrap.appendChild(title);
-        const copyToClipboardImage = document.createElement("img");
-        copyToClipboardImage.setAttribute("src", "./copytoclipboard.svg");
-        copyToClipboardImage.setAttribute("alt", "Copy to Clipboard");
-        const copyToolTip = document.createElement("div");
-        copyToolTip.classList.add("tooltip");
-        copyToolTip.textContent = "Copied to Clipboard";
-        const copyToClipboardButton = document.createElement("button");
-        copyToClipboardButton.setAttribute("class", "svgButton");
-        copyToClipboardButton.appendChild(copyToClipboardImage);
-        copyToClipboardButton.addEventListener("click", e => {
-            navigator.clipboard.writeText(window.location.href);
-            copyToClipboardButton.appendChild(copyToolTip);
-            setTimeout(() => {
-                copyToClipboardButton.removeChild(copyToolTip);
-            }, 2000);
-        });
-        h_wrap.appendChild(copyToClipboardButton);
-        jgp.appendChild(h_wrap);
+        jgp.appendChild(title);
         let thisPlayerPanel;
         for (let i = 0; i < players.length; i++) {
             const player = players[i];
@@ -64,6 +45,7 @@ export class JoinGamePanel extends HTMLElement {
             webSocket.send(JSON.stringify(data));
         });
         hc.appendChild(readyButton);
+        jgp.appendChild(document.createElement("br"));
         jgp.appendChild(hc);
         return jgp;
     }
